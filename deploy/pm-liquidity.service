@@ -1,0 +1,23 @@
+[Unit]
+Description=Prediction Market Liquidity Comparator
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/pm-liquidity/backend
+Environment=PORT=8000
+Environment=WORKERS=2
+EnvironmentFile=/opt/pm-liquidity/backend/.env
+ExecStart=/opt/pm-liquidity/backend/venv/bin/gunicorn main:app \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers 2 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile /var/log/pm-liquidity/access.log \
+    --error-logfile /var/log/pm-liquidity/error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

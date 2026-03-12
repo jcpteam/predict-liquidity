@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { fetchMappings, createMapping, deleteMapping, fetchMarkets } from '../../prediction-market-liquidity/frontend/src/api.js'
-import MappingManager from '../../prediction-market-liquidity/frontend/src/components/MappingManager.jsx'
-import ComparisonView from '../../prediction-market-liquidity/frontend/src/components/ComparisonView.jsx'
+import { fetchMappings, createMapping, deleteMapping, fetchMarkets } from './api'
+import MappingManager from './components/MappingManager.jsx'
+import ComparisonView from './components/ComparisonView.jsx'
 import './style.css'
 
 export default function App() {

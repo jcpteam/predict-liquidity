@@ -10,23 +10,104 @@
 - 流动性汇总表（Bid Depth / Ask Depth / Spread）
 - 支持动态添加新市场适配器
 
-## 快速启动
+## 环境要求
+
+- Python 3.11+
+- Node.js 18+
+- npm 9+
+
+## 快速启动（本地开发）
 
 ### 后端
 ```bash
-cd prediction-market-liquidity/backend
+cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env       # 编辑 .env 填入 API keys
 python main.py
 ```
 API 运行在 http://localhost:8000
 
 ### 前端
 ```bash
-cd prediction-market-liquidity/frontend
+cd frontend
 npm install
 npm run dev
 ```
 UI 运行在 http://localhost:5173
+
+## 部署
+
+### 方式一：一键脚本部署
+
+项目根目录提供了部署脚本，支持本地构建 + 启动：
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+脚本会自动完成：前端构建 → 后端依赖安装 → 使用 Gunicorn 启动服务（端口 8000）。
+
+### 方式二：Docker 部署
+
+```bash
+docker build -t prediction-market-liquidity .
+docker run -d \
+  --name pm-liquidity \
+  -p 8000:8000 \
+  --env-file backend/.env \
+  prediction-market-liquidity
+```
+
+### 方式三：Docker Compose
+
+```bash
+docker compose up -d
+```
+
+访问 http://localhost:8000
+
+### 方式四：手动部署到 VPS / 云服务器
+
+#### 1. 构建前端
+```bash
+cd frontend
+npm ci
+npm run build
+# 产物在 frontend/dist/
+```
+
+#### 2. 部署后端
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install gunicorn
+```
+
+#### 3. 配置环境变量
+```bash
+cp backend/.env.example backend/.env
+# 编辑 backend/.env 填入各市场 API Key
+```
+
+#### 4. 使用 systemd 管理进程
+```bash
+sudo cp deploy/pm-liquidity.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable pm-liquidity
+sudo systemctl start pm-liquidity
+```
+
+#### 5. Nginx 反向代理（推荐）
+```bash
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/pm-liquidity
+sudo ln -s /etc/nginx/sites-available/pm-liquidity /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ## 架构
 

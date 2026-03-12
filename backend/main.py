@@ -159,9 +159,14 @@ async def ws_live(websocket: WebSocket, unified_id: str):
 
 
 # ── 静态文件 (前端) ──
-frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+# 支持本地开发路径和 Docker 构建路径
+for candidate in [
+    Path(__file__).parent / "frontend_dist",       # Docker 构建
+    Path(__file__).parent.parent / "frontend" / "dist",  # 本地开发
+]:
+    if candidate.exists():
+        app.mount("/", StaticFiles(directory=str(candidate), html=True), name="frontend")
+        break
 
 
 if __name__ == "__main__":
