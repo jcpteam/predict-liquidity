@@ -166,6 +166,7 @@ header h1 { font-size: 20px; color: #58a6ff; }
 .detail-time { font-size: 13px; color: #8b949e; }
 .live-dot { color: #3fb950; font-size: 12px; }
 .timestamp { color: #484f58; font-size: 12px; }
+.auto-match-status { font-size: 12px; color: #d29922; }
 
 /* ── Linked markets section ── */
 .linked-section {
@@ -187,26 +188,31 @@ code {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ── Market section (per-market order books) ── */
-.market-section {
+/* ── Market row (per-market order books, one market per row) ── */
+.market-row {
   background: #161b22; border: 1px solid #30363d;
   border-radius: 10px; padding: 16px; margin-bottom: 16px;
 }
-.market-section-header {
+.market-row-header {
   display: flex; align-items: center; gap: 12px;
   margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #30363d;
 }
-.market-section-header h3 { font-size: 16px; color: #58a6ff; margin-bottom: 0; }
-.market-section-meta { font-size: 12px; color: #8b949e; }
-.market-section-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+.market-row-header h3 { font-size: 16px; color: #58a6ff; margin-bottom: 0; }
+.market-row-meta { font-size: 12px; color: #8b949e; }
+.market-row-cards {
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
+.market-row-cards::-webkit-scrollbar { height: 5px; }
+.market-row-cards::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+.market-row-cards::-webkit-scrollbar-track { background: transparent; }
 
 .ob-card {
   padding: 12px; background: #0d1117;
   border: 1px solid #30363d; border-radius: 8px;
+  min-width: 340px; flex-shrink: 0;
 }
 .ob-card-title { font-size: 13px; color: #c9d1d9; font-weight: 600; margin-bottom: 6px; line-height: 1.4; }
 .ob-card-meta {
