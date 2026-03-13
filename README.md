@@ -69,7 +69,62 @@ docker compose up -d
 
 访问 http://localhost:8000
 
-### 方式四：手动部署到 VPS / 云服务器
+### 方式四：Conda 部署
+
+适合已有 Anaconda / Miniconda 环境的用户，可以用 conda 管理 Python 和 Node.js 依赖。
+
+#### 1. 创建 conda 环境
+```bash
+conda create -n pm-liquidity python=3.12 nodejs=18 -y
+conda activate pm-liquidity
+```
+
+#### 2. 安装后端依赖
+```bash
+cd backend
+pip install -r requirements.txt
+pip install gunicorn uvloop httptools
+cp .env.example .env   # 编辑 .env 填入 API keys
+```
+
+#### 3. 构建前端
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+#### 4. 启动服务
+
+开发模式：
+```bash
+cd backend
+python main.py
+```
+
+生产模式：
+```bash
+cd backend
+gunicorn main:app \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --workers 2 \
+  --bind 0.0.0.0:8000
+```
+
+#### 导出环境（可选）
+
+导出 conda 环境供团队复用：
+```bash
+conda env export > environment.yml
+```
+
+其他人恢复环境：
+```bash
+conda env create -f environment.yml
+conda activate pm-liquidity
+```
+
+### 方式五：手动部署到 VPS / 云服务器
 
 #### 1. 构建前端
 ```bash

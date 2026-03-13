@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from models import OrderBook, OrderLevel, MarketEvent
 from .base import BaseMarketAdapter

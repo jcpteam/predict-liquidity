@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .base import BaseMarketAdapter
 from .polymarket import PolymarketAdapter
 from .kalshi import KalshiAdapter

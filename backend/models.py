@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 
 
@@ -15,21 +17,22 @@ class OrderBook(BaseModel):
 
 
 class MarketEvent(BaseModel):
-    market_id: str          # 该市场内部的事件ID
-    market_name: str        # 市场名称 (polymarket / kalshi / betfair / ...)
-    event_title: str        # 事件标题
-    outcome: str            # 结果选项 (e.g. "Yes", "No", "Team A Win")
+    market_id: str
+    market_name: str
+    event_title: str
+    outcome: str
     order_book: Optional[OrderBook] = None
     last_price: Optional[float] = None
     volume_24h: Optional[float] = None
 
 
 class EventMapping(BaseModel):
-    unified_id: str                     # 统一事件ID
-    display_name: str                   # 展示名称
+    unified_id: str                     # = polymarket event id
+    display_name: str
     sport: str = "soccer"
     event_time: Optional[datetime] = None
-    mappings: dict[str, str]            # {market_name: market_event_id}
+    mappings: dict[str, str] = {}       # {market_name: market_event_id}
+    polymarket_data: Optional[dict[str, Any]] = None  # 缓存的 polymarket 事件原始数据
 
 
 class MarketConfig(BaseModel):

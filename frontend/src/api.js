@@ -1,29 +1,28 @@
 const BASE = '/api'
 
-export async function fetchMappings() {
-  const res = await fetch(`${BASE}/mappings`)
+export async function fetchEvents() {
+  const res = await fetch(`${BASE}/events`)
   return res.json()
 }
 
-export async function createMapping(displayName, eventTime) {
-  const params = new URLSearchParams({ display_name: displayName })
-  if (eventTime) params.set('event_time', eventTime)
-  const res = await fetch(`${BASE}/mappings?${params}`, { method: 'POST' })
+export async function syncEvents() {
+  const res = await fetch(`${BASE}/events/sync`, { method: 'POST' })
   return res.json()
 }
 
-export async function deleteMapping(unifiedId) {
-  await fetch(`${BASE}/mappings/${unifiedId}`, { method: 'DELETE' })
+export async function fetchEventMapping(unifiedId) {
+  const res = await fetch(`${BASE}/events/${unifiedId}/mapping`)
+  return res.json()
 }
 
-export async function addMarketToMapping(unifiedId, marketName, marketEventId) {
+export async function addMarketMapping(unifiedId, marketName, marketEventId) {
   const params = new URLSearchParams({ market_name: marketName, market_event_id: marketEventId })
-  const res = await fetch(`${BASE}/mappings/${unifiedId}/market?${params}`, { method: 'PUT' })
+  const res = await fetch(`${BASE}/events/${unifiedId}/mapping?${params}`, { method: 'PUT' })
   return res.json()
 }
 
-export async function removeMarketFromMapping(unifiedId, marketName) {
-  await fetch(`${BASE}/mappings/${unifiedId}/market/${marketName}`, { method: 'DELETE' })
+export async function removeMarketMapping(unifiedId, marketName) {
+  await fetch(`${BASE}/events/${unifiedId}/mapping/${marketName}`, { method: 'DELETE' })
 }
 
 export async function fetchMarkets() {
@@ -37,8 +36,8 @@ export async function searchMarketEvents(marketName, query) {
   return res.json()
 }
 
-export async function fetchComparison(unifiedId) {
-  const res = await fetch(`${BASE}/compare/${unifiedId}`)
+export async function fetchOrderBooks(unifiedId) {
+  const res = await fetch(`${BASE}/events/${unifiedId}/orderbooks`)
   return res.json()
 }
 

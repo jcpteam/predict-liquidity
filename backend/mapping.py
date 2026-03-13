@@ -1,7 +1,7 @@
-"""事件映射管理 - 将不同市场的同一足球事件关联起来"""
+"""事件映射管理 - 以 Polymarket 事件为基础，其他市场映射到 Polymarket 事件上"""
+from __future__ import annotations
 
 import json
-import uuid
 from pathlib import Path
 from models import EventMapping
 
@@ -12,7 +12,7 @@ class EventMappingStore:
     def __init__(self, filepath: Path = MAPPING_FILE):
         self.filepath = filepath
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
-        self._mappings: dict[str, EventMapping] = {}
+        self._mappings: dict[str, EventMapping] = {}  # key = polymarket event id
         self._load()
 
     def _load(self):
@@ -25,19 +25,30 @@ class EventMappingStore:
         raw = {uid: m.model_dump(mode="json") for uid, m in self._mappings.items()}
         self.filepath.write_text(json.dumps(raw, indent=2, default=str))
 
-    def create_mapping(self, display_name: str, event_time: str | None = None) -> EventMapping:
-        uid = str(uuid.uuid4())[:8]
-        mapping = EventMapping(
-            unified_id=uid,
-            display_name=display_name,
-            event_time=event_time,
-            mappings={},
-        )
-        self._mappings[uid] = mapping
+    def sync_from_polymarket(self, events: list[dict]):
+        """从 Polymarket 事件列表同步，以 polymarket event id 为 unified_id"""
+        existing_ids = set(self._mappings.keys())
+        incoming_ids = set()
+        for ev in events:
+            eid = str(ev.get("id", ""))
+            if not eid:
+                continue
+            incoming_ids.add(eid)
+            if eid not in self._mappings:
+                self._mappings[eid] = EventMapping(
+                    unified_id=eid,
+                    display_name=ev.get("title", ""),
+                    event_time=ev.get("startDate"),
+                    mappings={"polymarket": eid},
+                    polymarket_data=ev,
+                )
+            else:
+                # 更新 polymarket 数据
+                self._mappings[eid].display_name = ev.get("title", self._mappings[eid].display_name)
+                self._mappings[eid].polymarket_data = ev
         self._save()
-        return mapping
 
-    def add_market_to_mapping(self, unified_id: str, market_name: str, market_event_id: str) -> EventMapping | None:
+    def add_market_mapping(self, unified_id: str, market_name: str, market_event_id: str) -> EventMapping | None:
         mapping = self._mappings.get(unified_id)
         if not mapping:
             return None
@@ -45,29 +56,18 @@ class EventMappingStore:
         self._save()
         return mapping
 
-    def remove_market_from_mapping(self, unified_id: str, market_name: str) -> EventMapping | None:
+    def remove_market_mapping(self, unified_id: str, market_name: str) -> EventMapping | None:
         mapping = self._mappings.get(unified_id)
         if not mapping:
             return None
+        if market_name == "polymarket":
+            return mapping  # 不允许移除 polymarket 基础映射
         mapping.mappings.pop(market_name, None)
         self._save()
         return mapping
-
-    def delete_mapping(self, unified_id: str) -> bool:
-        if unified_id in self._mappings:
-            del self._mappings[unified_id]
-            self._save()
-            return True
-        return False
 
     def get_mapping(self, unified_id: str) -> EventMapping | None:
         return self._mappings.get(unified_id)
 
     def list_mappings(self) -> list[EventMapping]:
         return list(self._mappings.values())
-
-    def find_by_market_event(self, market_name: str, market_event_id: str) -> EventMapping | None:
-        for m in self._mappings.values():
-            if m.mappings.get(market_name) == market_event_id:
-                return m
-        return None
