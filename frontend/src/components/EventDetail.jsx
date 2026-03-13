@@ -130,6 +130,9 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
                   <h3 className="market-header">{mname.toUpperCase()}</h3>
                   {events.map((ev, i) => (
                     <div key={i} className="event-card">
+                      {ev.event_title && (
+                        <div className="event-card-title">{ev.event_title}</div>
+                      )}
                       <div className="event-meta">
                         <span className="outcome-label">{ev.outcome}</span>
                         {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}

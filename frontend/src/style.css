@@ -200,7 +200,12 @@ button:hover { background: #2ea043; }
   border: 1px solid #30363d;
   border-radius: 8px;
   padding: 12px;
+  max-height: 600px;
+  overflow-y: auto;
 }
+.market-column::-webkit-scrollbar { width: 5px; }
+.market-column::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+.market-column::-webkit-scrollbar-track { background: transparent; }
 .market-header {
   text-align: center;
   font-size: 14px;
@@ -214,6 +219,13 @@ button:hover { background: #2ea043; }
   padding: 8px;
   background: #161b22;
   border-radius: 6px;
+}
+.event-card-title {
+  font-size: 12px;
+  color: #c9d1d9;
+  font-weight: 600;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 .event-meta {
   display: flex;
@@ -232,6 +244,10 @@ button:hover { background: #2ea043; }
 /* Order book */
 .order-book { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ob-label { font-size: 10px; font-weight: 700; color: #8b949e; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px; }
+.ob-rows-scroll { max-height: 240px; overflow-y: auto; }
+.ob-rows-scroll::-webkit-scrollbar { width: 4px; }
+.ob-rows-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+.ob-rows-scroll::-webkit-scrollbar-track { background: transparent; }
 .ob-row { position: relative; display: flex; justify-content: space-between; padding: 1px 5px; font-size: 11px; margin-bottom: 1px; }
 .ob-bar { position: absolute; top: 0; left: 0; height: 100%; border-radius: 2px; opacity: 0.2; }
 .bid-bar { background: #3fb950; }
