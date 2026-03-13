@@ -247,3 +247,19 @@ button:hover { background: #2ea043; }
 .liquidity-summary table { width: 100%; border-collapse: collapse; }
 .liquidity-summary th, .liquidity-summary td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #21262d; font-size: 13px; }
 .liquidity-summary th { color: #8b949e; font-weight: 600; }
+
+/* Auto-match */
+.auto-match-btn { background: #8957e5; }
+.auto-match-btn:hover { background: #a371f7; }
+.match-result-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  background: #1c2128;
+  border-bottom: 1px solid #30363d;
+  font-size: 13px;
+  color: #8b949e;
+  flex-wrap: wrap;
+}
+.match-result-banner span { color: #3fb950; }

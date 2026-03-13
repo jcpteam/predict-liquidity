@@ -13,6 +13,7 @@ from pathlib import Path
 from models import EventMapping, MarketEvent
 from mapping import EventMappingStore
 from markets.registry import MarketRegistry
+from automatch import AutoMatcher
 
 
 # ── Global state ──
@@ -120,6 +121,26 @@ async def search_market_events(market_name: str, q: str = ""):
     if not adapter:
         raise HTTPException(404, f"Market '{market_name}' not found")
     return await adapter.search_soccer_events(q)
+
+
+# ── REST: 自动映射 ──
+
+@app.post("/api/automatch/{market_name}")
+async def auto_match_market(market_name: str):
+    """对指定市场执行自动映射"""
+    matcher = AutoMatcher(mapping_store, registry)
+    result = await matcher.auto_match_market(market_name)
+    if "error" in result and result.get("matched", -1) < 0:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/api/automatch")
+async def auto_match_all():
+    """对所有非 polymarket 市场执行自动映射"""
+    matcher = AutoMatcher(mapping_store, registry)
+    results = await matcher.auto_match_all()
+    return {"results": results}
 
 
 # ── REST: 按需加载 Order Book 对比 ──

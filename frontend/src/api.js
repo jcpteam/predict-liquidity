@@ -41,6 +41,16 @@ export async function fetchOrderBooks(unifiedId) {
   return res.json()
 }
 
+export async function autoMatchMarket(marketName) {
+  const res = await fetch(`${BASE}/automatch/${marketName}`, { method: 'POST' })
+  return res.json()
+}
+
+export async function autoMatchAll() {
+  const res = await fetch(`${BASE}/automatch`, { method: 'POST' })
+  return res.json()
+}
+
 export function createLiveSocket(unifiedId, onMessage) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const ws = new WebSocket(`${proto}://${window.location.host}/ws/live/${unifiedId}`)
