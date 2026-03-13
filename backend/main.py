@@ -58,6 +58,12 @@ async def list_events():
     result = []
     for m in mappings:
         pm = m.polymarket_data or {}
+        # 提取 tag labels 用于前端分类
+        tags = []
+        for t in pm.get("tags", []):
+            label = t.get("label", t.get("slug", "")) if isinstance(t, dict) else str(t)
+            if label:
+                tags.append(label)
         result.append({
             "unified_id": m.unified_id,
             "display_name": m.display_name,
@@ -69,6 +75,7 @@ async def list_events():
             "end_date": pm.get("endDate"),
             "market_count": len(pm.get("markets", [])),
             "linked_markets": list(m.mappings.keys()),
+            "tags": tags,
         })
     return result
 
