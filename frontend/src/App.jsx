@@ -74,9 +74,11 @@ export default function App() {
 
   const handleSync = async () => {
     setSyncing(true)
-    await syncEvents()
-    await reload()
-    setSyncing(false)
+    try {
+      const res = await syncEvents()
+      setMatchResult(res.auto_match ? { results: res.auto_match } : null)
+      await reload()
+    } finally { setSyncing(false) }
   }
 
   const handleAutoMatch = async () => {

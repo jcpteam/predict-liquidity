@@ -268,7 +268,7 @@ class AutoMatcher:
         except Exception as e:
             return {"error": str(e), "matched": 0}
 
-        pm_mappings = self.mapping_store.list_mappings()
+        pm_mappings = await self.mapping_store.list_mappings()
         matched = 0
         skipped = 0
         results = []
@@ -298,7 +298,7 @@ class AutoMatcher:
 
             if best_score >= self.MATCH_THRESHOLD and best_pm_id:
                 other_id = other_ev.get("market_id", "")
-                self.mapping_store.add_market_mapping(best_pm_id, market_name, other_id)
+                await self.mapping_store.add_market_mapping(best_pm_id, market_name, other_id)
                 matched += 1
                 results.append({
                     "polymarket": best_pm_name,
