@@ -1,32 +1,72 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, createLiveSocket } from '../api'
+import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, fetchOrderBooks, autoMatchMarket } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
+
+const MARKET_ORDER = ['polymarket', 'kalshi', 'betfair']
+
+function sortMarketNames(names) {
+  return [...names].sort((a, b) => {
+    const ia = MARKET_ORDER.indexOf(a)
+    const ib = MARKET_ORDER.indexOf(b)
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+  })
+}
 
 export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const [mapping, setMapping] = useState(null)
-  const [liveData, setLiveData] = useState(null)
+  const [orderBookData, setOrderBookData] = useState(null)
+  const [loadingOB, setLoadingOB] = useState(false)
+  const [autoMatching, setAutoMatching] = useState(false)
   const [addingMarket, setAddingMarket] = useState(false)
   const [selectedMarket, setSelectedMarket] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [manualId, setManualId] = useState('')
-  const wsRef = useRef(null)
+  const matchAttemptedRef = useRef(false)
 
-  // 加载映射
+  // Load mapping
   useEffect(() => {
-    setLiveData(null)
+    setOrderBookData(null)
+    matchAttemptedRef.current = false
     fetchEventMapping(unifiedId).then(setMapping)
   }, [unifiedId])
 
-  // WebSocket 实时 order book
+  // Auto-match unlinked markets on mount, then load order books
   useEffect(() => {
-    if (wsRef.current) wsRef.current.close()
-    const ws = createLiveSocket(unifiedId, (msg) => {
-      if (!msg.error) setLiveData(msg)
-    })
-    wsRef.current = ws
-    return () => ws.close()
-  }, [unifiedId])
+    if (!mapping) return
+    const otherMarkets = markets.filter(m => m !== 'polymarket')
+    const unlinked = otherMarkets.filter(m => !mapping.mappings[m])
+
+    const doAutoMatchAndLoad = async () => {
+      if (unlinked.length > 0 && !matchAttemptedRef.current) {
+        matchAttemptedRef.current = true
+        setAutoMatching(true)
+        try {
+          for (const m of unlinked) {
+            await autoMatchMarket(m)
+          }
+          const updated = await fetchEventMapping(unifiedId)
+          setMapping(updated)
+          onMappingChange()
+        } catch (e) {
+          console.error('Auto-match failed:', e)
+        } finally {
+          setAutoMatching(false)
+        }
+      }
+      // Load order books
+      setLoadingOB(true)
+      try {
+        const data = await fetchOrderBooks(unifiedId)
+        setOrderBookData(data)
+      } catch (e) {
+        console.error('Failed to load order books:', e)
+      } finally {
+        setLoadingOB(false)
+      }
+    }
+    doAutoMatchAndLoad()
+  }, [mapping?.unified_id])
 
   const otherMarkets = markets.filter(m => m !== 'polymarket')
 
@@ -50,6 +90,13 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     const updated = await fetchEventMapping(unifiedId)
     setMapping(updated)
     onMappingChange()
+    // Reload order books
+    setLoadingOB(true)
+    try {
+      const data = await fetchOrderBooks(unifiedId)
+      setOrderBookData(data)
+    } catch (e) { console.error(e) }
+    finally { setLoadingOB(false) }
   }
 
   const handleRemove = async (marketName) => {
@@ -59,18 +106,22 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     onMappingChange()
   }
 
-  if (!mapping) return <div className="detail-panel"><p>Loading...</p></div>
+  if (!mapping) return <div className="detail-page"><p>Loading...</p></div>
 
-  const marketNames = liveData ? Object.keys(liveData.markets || {}) : []
+  const marketNames = orderBookData ? sortMarketNames(Object.keys(orderBookData.markets || {})) : []
 
   return (
-    <div className="detail-panel">
-      <h2>{mapping.display_name}</h2>
-      {mapping.event_time && (
-        <p className="timestamp">Event: {new Date(mapping.event_time).toLocaleString()}</p>
-      )}
+    <div className="detail-page">
+      <div className="detail-title-bar">
+        <h2>{mapping.display_name}</h2>
+        <div className="detail-title-meta">
+          {mapping.event_time && <span className="detail-time">🕐 {new Date(mapping.event_time).toLocaleString()}</span>}
+          {autoMatching && <span className="auto-match-status">🔄 Auto-matching markets...</span>}
+          {loadingOB && <span className="auto-match-status">📊 Loading order books...</span>}
+        </div>
+      </div>
 
-      {/* 已关联的市场 */}
+      {/* Linked markets */}
       <div className="linked-section">
         <h3>Linked Markets</h3>
         <div className="linked-list">
@@ -114,42 +165,45 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         )}
       </div>
 
-      {/* Order Book 对比 */}
-      <div className="comparison-section">
-        <h3>📊 Order Book Comparison {liveData && <span className="live-dot">● LIVE</span>}</h3>
-        {liveData && <p className="timestamp">Last update: {new Date(liveData.timestamp).toLocaleTimeString()}</p>}
-        {!liveData && <p className="empty">Connecting to live feed...</p>}
+      {/* Order Books - one market per row, outcomes horizontal */}
+      {!loadingOB && !orderBookData && !autoMatching && (
+        <p className="empty">No order book data available.</p>
+      )}
 
-        {marketNames.length > 0 && (
-          <div className="comparison-grid">
-            {marketNames.map(mname => {
-              const events = liveData.markets[mname]
-              if (!events || events.length === 0) return null
-              return (
-                <div key={mname} className="market-column">
-                  <h3 className="market-header">{mname.toUpperCase()}</h3>
-                  {events.map((ev, i) => (
-                    <div key={i} className="event-card">
-                      {ev.event_title && (
-                        <div className="event-card-title">{ev.event_title}</div>
-                      )}
-                      <div className="event-meta">
-                        <span className="outcome-label">{ev.outcome}</span>
-                        {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}
-                        {ev.volume_24h != null && <span className="volume">Vol: ${Number(ev.volume_24h).toLocaleString()}</span>}
-                      </div>
-                      {ev.order_book && <OrderBookChart orderBook={ev.order_book} />}
-                      {ev.error && <p className="error">{ev.error}</p>}
+      {marketNames.map(mname => {
+        const events = orderBookData.markets[mname]
+        if (!events || events.length === 0) return null
+        const hasError = events.length === 1 && events[0].error
+        return (
+          <div key={mname} className="market-row">
+            <div className="market-row-header">
+              <h3>{mname.toUpperCase()}</h3>
+              <span className="market-row-meta">{events.length} outcome{events.length > 1 ? 's' : ''}</span>
+            </div>
+            {hasError ? (
+              <p className="error">{events[0].error}</p>
+            ) : (
+              <div className="market-row-cards">
+                {events.map((ev, i) => (
+                  <div key={i} className="ob-card">
+                    {ev.event_title && <div className="ob-card-title">{ev.event_title}</div>}
+                    <div className="ob-card-meta">
+                      <span className="outcome-label">{ev.outcome}</span>
+                      {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}
+                      {ev.volume_24h != null && <span className="volume">Vol: ${Number(ev.volume_24h).toLocaleString()}</span>}
                     </div>
-                  ))}
-                </div>
-              )
-            })}
+                    {ev.order_book && <OrderBookChart orderBook={ev.order_book} />}
+                    {ev.error && <p className="error">{ev.error}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        )
+      })}
 
-        {marketNames.length >= 2 && <LiquiditySummary data={liveData} />}
-      </div>
+      {/* Liquidity summary */}
+      {marketNames.length >= 2 && orderBookData && <LiquiditySummary data={orderBookData} />}
     </div>
   )
 }

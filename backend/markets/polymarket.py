@@ -53,7 +53,8 @@ class PolymarketAdapter(BaseMarketAdapter):
                     break
                 offset += limit
             except Exception as e:
-                print(f"[polymarket] fetch_all_soccer_events error at offset {offset}: {e}")
+                print(f"[polymarket] fetch_all_soccer_events error at offset {offset}: {type(e).__name__}: {e}")
+                import traceback; traceback.print_exc()
                 break
         return all_events
 

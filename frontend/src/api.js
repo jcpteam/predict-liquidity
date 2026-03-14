@@ -1,7 +1,12 @@
 const BASE = '/api'
 
-export async function fetchEvents() {
-  const res = await fetch(`${BASE}/events`)
+export async function fetchLeagues() {
+  const res = await fetch(`${BASE}/leagues`)
+  return res.json()
+}
+
+export async function fetchLeagueEvents(league) {
+  const res = await fetch(`${BASE}/leagues/${encodeURIComponent(league)}/events`)
   return res.json()
 }
 

@@ -48,14 +48,24 @@ def _extract_tags(pm_data: dict) -> list[str]:
     return tags
 
 
-def _parse_end_date(pm_data: dict) -> Optional[datetime]:
-    s = pm_data.get("endDate", "")
+def _parse_datetime(val) -> Optional[datetime]:
+    """安全解析各种格式的日期时间字符串"""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val
+    s = str(val).strip()
     if not s:
         return None
     try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except (ValueError, TypeError):
-        return None
+        pass
+    return None
+
+
+def _parse_end_date(pm_data: dict) -> Optional[datetime]:
+    return _parse_datetime(pm_data.get("endDate", ""))
 
 
 class EventMappingStore:
@@ -64,66 +74,105 @@ class EventMappingStore:
     # ── 同步 Polymarket 事件到数据库 ──
 
     async def sync_from_polymarket(self, events: list[dict]) -> dict:
+        """使用 raw SQL 批量 INSERT ... ON DUPLICATE KEY UPDATE，大幅减少网络往返"""
         now = datetime.now(timezone.utc)
+
+        # 先查出已有的 unified_id 用于统计 new vs updated
+        async with async_session() as session:
+            existing_rows = (await session.execute(
+                select(DBEvent.unified_id)
+            )).scalars().all()
+        existing_ids = set(existing_rows)
+
         new_count = 0
         updated_count = 0
-        async with async_session() as session:
-            for ev in events:
+
+        # 分批处理，每批 200 条，用 raw SQL 批量 upsert
+        batch_size = 200
+        for i in range(0, len(events), batch_size):
+            batch = events[i:i + batch_size]
+            event_rows = []
+            mapping_rows = []
+
+            for ev in batch:
                 eid = str(ev.get("id", ""))
                 if not eid:
                     continue
                 tags = _extract_tags(ev)
                 league = _get_league_tag(tags)
                 end_date = _parse_end_date(ev)
+                pm_json = json.dumps(ev, default=str)
 
-                existing = await session.get(DBEvent, eid)
-                if existing:
-                    existing.display_name = ev.get("title", existing.display_name)
-                    existing.league = league
-                    existing.end_date = end_date
-                    existing.image = ev.get("icon") or ev.get("image")
-                    existing.liquidity = str(ev.get("liquidity", ""))
-                    existing.volume = str(ev.get("volume", ""))
-                    existing.volume_24hr = str(ev.get("volume24hr", ""))
-                    existing.market_count = len(ev.get("markets", []))
-                    existing.tags_json = json.dumps(tags)
-                    existing.polymarket_data_json = json.dumps(ev, default=str)
-                    existing.is_active = True
-                    existing.updated_at = now
-                    updated_count += 1
-                else:
-                    db_ev = DBEvent(
-                        unified_id=eid,
-                        display_name=ev.get("title", ""),
-                        league=league,
-                        event_time=ev.get("startDate"),
-                        end_date=end_date,
-                        image=ev.get("icon") or ev.get("image"),
-                        liquidity=str(ev.get("liquidity", "")),
-                        volume=str(ev.get("volume", "")),
-                        volume_24hr=str(ev.get("volume24hr", "")),
-                        market_count=len(ev.get("markets", [])),
-                        tags_json=json.dumps(tags),
-                        polymarket_data_json=json.dumps(ev, default=str),
-                        is_active=True,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    session.add(db_ev)
+                is_new = eid not in existing_ids
+                if is_new:
                     new_count += 1
+                    existing_ids.add(eid)
+                else:
+                    updated_count += 1
 
-                    # 自动添加 polymarket 自身映射
-                    pm_map = DBMapping(
-                        unified_id=eid,
-                        market_name="polymarket",
-                        market_event_id=eid,
-                        created_at=now,
+                event_rows.append({
+                    "unified_id": eid,
+                    "display_name": ev.get("title", "")[:500],
+                    "sport": "soccer",
+                    "league": league,
+                    "event_time": _parse_datetime(ev.get("startDate")),
+                    "end_date": end_date,
+                    "is_active": True,
+                    "image": (ev.get("icon") or ev.get("image") or "")[:1000],
+                    "liquidity": str(ev.get("liquidity", "")),
+                    "volume": str(ev.get("volume", "")),
+                    "volume_24hr": str(ev.get("volume24hr", "")),
+                    "market_count": len(ev.get("markets", [])),
+                    "tags_json": json.dumps(tags),
+                    "polymarket_data_json": pm_json,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+
+                if is_new:
+                    mapping_rows.append({
+                        "unified_id": eid,
+                        "market_name": "polymarket",
+                        "market_event_id": eid,
+                        "created_at": now,
+                    })
+
+            if not event_rows:
+                continue
+
+            async with async_session() as session:
+                # Bulk upsert events using INSERT ... ON DUPLICATE KEY UPDATE
+                from sqlalchemy.dialects.mysql import insert as mysql_insert
+                stmt = mysql_insert(DBEvent).values(event_rows)
+                stmt = stmt.on_duplicate_key_update(
+                    display_name=stmt.inserted.display_name,
+                    league=stmt.inserted.league,
+                    end_date=stmt.inserted.end_date,
+                    image=stmt.inserted.image,
+                    liquidity=stmt.inserted.liquidity,
+                    volume=stmt.inserted.volume,
+                    volume_24hr=stmt.inserted.volume_24hr,
+                    market_count=stmt.inserted.market_count,
+                    tags_json=stmt.inserted.tags_json,
+                    polymarket_data_json=stmt.inserted.polymarket_data_json,
+                    is_active=True,
+                    updated_at=stmt.inserted.updated_at,
+                )
+                await session.execute(stmt)
+
+                # Bulk insert new mappings (ignore duplicates)
+                if mapping_rows:
+                    m_stmt = mysql_insert(DBMapping).values(mapping_rows)
+                    m_stmt = m_stmt.on_duplicate_key_update(
+                        market_event_id=m_stmt.inserted.market_event_id,
                     )
-                    session.add(pm_map)
+                    await session.execute(m_stmt)
 
-            await session.commit()
+                await session.commit()
+            print(f"  [sync] batch {i//batch_size+1}: {len(event_rows)} events")
 
-            # 更新联赛表
+        # 更新联赛表
+        async with async_session() as session:
             await self._refresh_leagues(session)
             await session.commit()
 
@@ -259,11 +308,54 @@ class EventMappingStore:
     async def list_events_by_league(self, league: str) -> list[dict]:
         async with async_session() as session:
             events = (await session.execute(
-                select(DBEvent).where(
+                select(
+                    DBEvent.unified_id, DBEvent.display_name, DBEvent.event_time,
+                    DBEvent.end_date, DBEvent.league, DBEvent.liquidity,
+                    DBEvent.volume_24hr, DBEvent.volume, DBEvent.image,
+                    DBEvent.market_count, DBEvent.tags_json,
+                ).where(
                     and_(DBEvent.is_active == True, DBEvent.league == league)
                 )
-            )).scalars().all()
-            return [self._event_to_dict(ev) for ev in events]
+            )).all()
+
+            if not events:
+                return []
+
+            # 批量查出这些事件的 mappings
+            eids = [e.unified_id for e in events]
+            maps = (await session.execute(
+                select(DBMapping.unified_id, DBMapping.market_name)
+                .where(DBMapping.unified_id.in_(eids))
+            )).all()
+
+            # 按 unified_id 分组
+            mapping_dict: dict[str, list[str]] = {}
+            for uid, mname in maps:
+                mapping_dict.setdefault(uid, []).append(mname)
+
+            result = []
+            for ev in events:
+                tags = []
+                if ev.tags_json:
+                    try:
+                        tags = json.loads(ev.tags_json)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                result.append({
+                    "unified_id": ev.unified_id,
+                    "display_name": ev.display_name,
+                    "event_time": ev.event_time.isoformat() if ev.event_time else None,
+                    "end_date": ev.end_date.isoformat() if ev.end_date else None,
+                    "league": ev.league,
+                    "liquidity": ev.liquidity,
+                    "volume_24hr": ev.volume_24hr,
+                    "volume": ev.volume,
+                    "image": ev.image,
+                    "market_count": ev.market_count,
+                    "tags": tags,
+                    "linked_markets": mapping_dict.get(ev.unified_id, []),
+                })
+            return result
 
     def _event_to_dict(self, ev: DBEvent) -> dict:
         tags = []

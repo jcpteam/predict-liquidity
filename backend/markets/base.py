@@ -12,7 +12,7 @@ class BaseMarketAdapter(ABC):
 
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key
-        self.client = httpx.AsyncClient(timeout=15.0)
+        self.client = httpx.AsyncClient(timeout=60.0)
 
     @abstractmethod
     async def fetch_order_book(self, market_id: str, outcome: str) -> OrderBook | None:

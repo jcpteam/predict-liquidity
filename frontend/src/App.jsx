@@ -1,83 +1,68 @@
 import React, { useState, useEffect } from 'react'
-import { fetchEvents, syncEvents, fetchMarkets, autoMatchAll } from './api'
+import { fetchLeagues, fetchLeagueEvents, syncEvents, fetchMarkets, autoMatchAll } from './api'
 import LeagueSidebar from './components/LeagueSidebar.jsx'
 import EventDashboard from './components/EventDashboard.jsx'
 import EventDetail from './components/EventDetail.jsx'
 import './style.css'
 
-// 通用 tag 过滤
-const GENERIC_TAGS = new Set([
-  'Soccer','Sports','Games','Goals','Awards','Culture',
-  'Celebrities','World','Parlays','Geopolitics','Politics',
-  'Hide From New','yellow card','red card','red cards',
-  'assists','assist','goal','goal contributions','goals',
-  'clean sheet','clean sheets','goalie','goalkeeper','keeper',
-  'card','golden boot','most valuable player','mvp',
-  'man of the match','player of the match','motm','potm',
-  'transfer','sea',
-])
-const TAG_NORMALIZE = {
-  'Premier League':'EPL','Champions League':'UCL',
-  'Europa League':'UEL',"Women's Champions League":'UWCL',
-  'UEFA Europa League':'UEL','UEFA Conference League':'UECL',
-  'Europa Conference League':'UECL','Carabao Cup':'EFL Cup',
-}
-
-function getLeagueTag(tags) {
-  if (!tags || !tags.length) return 'Other'
-  for (const t of tags) {
-    if (GENERIC_TAGS.has(t)) continue
-    if (/^[a-z]/.test(t) && !t.includes(' League') && !t.includes(' Cup')) continue
-    return TAG_NORMALIZE[t] || t
-  }
-  return 'Other'
-}
-
 export default function App() {
+  const [leagues, setLeagues] = useState([])
   const [events, setEvents] = useState([])
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingEvents, setLoadingEvents] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [matching, setMatching] = useState(false)
   const [matchResult, setMatchResult] = useState(null)
   const [selectedLeague, setSelectedLeague] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState(null)
 
-  const reload = async () => {
+  // 加载联赛列表和市场列表（从数据库）
+  const loadLeagues = async () => {
     setLoading(true)
     try {
-      const [evts, mkts] = await Promise.all([fetchEvents(), fetchMarkets()])
-      setEvents(evts)
+      const [lgs, mkts] = await Promise.all([fetchLeagues(), fetchMarkets()])
+      setLeagues(lgs)
       setMarkets(mkts.markets || [])
+      return lgs
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { reload() }, [])
-
-  // 按联赛分组
-  const grouped = {}
-  for (const ev of events) {
-    const league = getLeagueTag(ev.tags)
-    if (!grouped[league]) grouped[league] = []
-    grouped[league].push(ev)
-  }
-  const leagues = Object.entries(grouped)
-    .sort((a, b) => {
-      if (a[0] === 'Other') return 1
-      if (b[0] === 'Other') return -1
-      return b[1].length - a[1].length
+  useEffect(() => {
+    loadLeagues().then(lgs => {
+      if (lgs.length > 0 && !selectedLeague) {
+        const first = lgs[0].name
+        setSelectedLeague(first)
+        loadEventsForLeague(first)
+      }
     })
+  }, [])
 
-  // 默认选中第一个联赛
-  const activeLeague = selectedLeague || (leagues[0] ? leagues[0][0] : null)
-  const leagueEvents = activeLeague ? (grouped[activeLeague] || []) : []
+  // 加载某个联赛的事件（从数据库）
+  const loadEventsForLeague = async (league) => {
+    setLoadingEvents(true)
+    try {
+      const evts = await fetchLeagueEvents(league)
+      setEvents(evts)
+    } finally { setLoadingEvents(false) }
+  }
+
+  const handleSelectLeague = (league) => {
+    setSelectedLeague(league)
+    loadEventsForLeague(league)
+  }
 
   const handleSync = async () => {
     setSyncing(true)
     try {
       const res = await syncEvents()
       setMatchResult(res.auto_match ? { results: res.auto_match } : null)
-      await reload()
+      const lgs = await loadLeagues()
+      if (selectedLeague) loadEventsForLeague(selectedLeague)
+      else if (lgs.length > 0) {
+        setSelectedLeague(lgs[0].name)
+        loadEventsForLeague(lgs[0].name)
+      }
     } finally { setSyncing(false) }
   }
 
@@ -87,11 +72,14 @@ export default function App() {
     try {
       const res = await autoMatchAll()
       setMatchResult(res)
-      await reload()
+      if (selectedLeague) loadEventsForLeague(selectedLeague)
     } finally { setMatching(false) }
   }
 
-  // 如果选中了某个赛事，显示详情页
+  // 联赛列表格式转换给 LeagueSidebar
+  const leagueEntries = leagues.map(l => [l.name, { length: l.count }])
+  const totalCount = leagues.reduce((s, l) => s + l.count, 0)
+
   if (selectedEventId) {
     return (
       <div className="app">
@@ -105,7 +93,7 @@ export default function App() {
           <EventDetail
             unifiedId={selectedEventId}
             markets={markets}
-            onMappingChange={reload}
+            onMappingChange={() => { if (selectedLeague) loadEventsForLeague(selectedLeague) }}
           />
         </div>
       </div>
@@ -135,15 +123,15 @@ export default function App() {
 
       <div className="main-layout">
         <LeagueSidebar
-          leagues={leagues}
-          activeLeague={activeLeague}
-          onSelect={setSelectedLeague}
-          totalCount={events.length}
+          leagues={leagueEntries}
+          activeLeague={selectedLeague}
+          onSelect={handleSelectLeague}
+          totalCount={totalCount}
         />
         <EventDashboard
-          league={activeLeague}
-          events={leagueEvents}
-          loading={loading}
+          league={selectedLeague}
+          events={events}
+          loading={loading || loadingEvents}
           onSelectEvent={setSelectedEventId}
         />
       </div>

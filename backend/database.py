@@ -5,16 +5,37 @@ import os
 import json
 from datetime import datetime, timezone
 from typing import Optional
+from pathlib import Path
+from urllib.parse import quote as _url_quote
 
-from dotenv import load_dotenv
 from sqlalchemy import (
     Column, String, Text, DateTime, Boolean, Integer,
-    create_engine, text,
+    UniqueConstraint, create_engine, text,
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
-load_dotenv()
+
+def _load_env_file():
+    """手动解析 .env 文件，不依赖 python-dotenv"""
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+_load_env_file()
 
 DB_TYPE = os.getenv("db_type", "mysql")
 DB_HOST = os.getenv("db_host", "127.0.0.1")
@@ -24,7 +45,7 @@ DB_PASSWD = os.getenv("db_passwd", "")
 DB_NAME = os.getenv("db_name", "predict_liquidity")
 
 DATABASE_URL = (
-    f"mysql+aiomysql://{DB_USER}:{DB_PASSWD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    f"mysql+aiomysql://{DB_USER}:{_url_quote(DB_PASSWD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     "?charset=utf8mb4"
 )
 
@@ -64,7 +85,7 @@ class DBEvent(Base):
     volume_24hr = Column(String(50), nullable=True)
     market_count = Column(Integer, default=0)
     tags_json = Column(Text, nullable=True)  # JSON array of tag strings
-    polymarket_data_json = Column(Text, nullable=True)  # full polymarket event JSON
+    polymarket_data_json = Column(LONGTEXT, nullable=True)  # full polymarket event JSON
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
@@ -81,7 +102,7 @@ class DBMapping(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-        # unique constraint: one mapping per (unified_id, market_name)
+        UniqueConstraint("unified_id", "market_name", name="uq_mapping_event_market"),
         {"mysql_charset": "utf8mb4"},
     )
 

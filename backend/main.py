@@ -46,33 +46,16 @@ app.add_middleware(
 )
 
 
-# ── 事件列表 ──
+# ── 事件列表 (从数据库加载) ──
 
-@app.get("/api/events")
-async def list_events():
-    mappings = await mapping_store.list_mappings()
-    result = []
-    for m in mappings:
-        pm = m.polymarket_data or {}
-        tags = []
-        for t in pm.get("tags", []):
-            label = t.get("label", t.get("slug", "")) if isinstance(t, dict) else str(t)
-            if label:
-                tags.append(label)
-        result.append({
-            "unified_id": m.unified_id,
-            "display_name": m.display_name,
-            "event_time": m.event_time,
-            "liquidity": pm.get("liquidity"),
-            "volume_24hr": pm.get("volume24hr"),
-            "volume": pm.get("volume"),
-            "image": pm.get("icon") or pm.get("image"),
-            "end_date": pm.get("endDate"),
-            "market_count": len(pm.get("markets", [])),
-            "linked_markets": list(m.mappings.keys()),
-            "tags": tags,
-        })
-    return result
+@app.get("/api/leagues")
+async def list_leagues():
+    return await mapping_store.list_leagues()
+
+
+@app.get("/api/leagues/{league}/events")
+async def list_league_events(league: str):
+    return await mapping_store.list_events_by_league(league)
 
 
 # ── 同步: 拉取新事件 + 清理已结束 + 自动匹配 ──
@@ -192,13 +175,6 @@ async def get_event_orderbooks(unified_id: str):
 async def cleanup_events():
     count = await mapping_store.cleanup_expired()
     return {"removed": count}
-
-
-# ── 联赛列表 ──
-
-@app.get("/api/leagues")
-async def list_leagues():
-    return await mapping_store.list_leagues()
 
 
 # ── 静态文件 ──
