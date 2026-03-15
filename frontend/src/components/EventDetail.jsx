@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, fetchOrderBooks, autoMatchMarket } from '../api'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, autoMatchMarket, createOrderBookSocket } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
 
 const MARKET_ORDER = ['polymarket', 'kalshi', 'betfair']
@@ -15,7 +15,8 @@ function sortMarketNames(names) {
 export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const [mapping, setMapping] = useState(null)
   const [orderBookData, setOrderBookData] = useState(null)
-  const [loadingOB, setLoadingOB] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState(null)
   const [autoMatching, setAutoMatching] = useState(false)
   const [addingMarket, setAddingMarket] = useState(false)
   const [selectedMarket, setSelectedMarket] = useState('')
@@ -23,80 +24,127 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const [searchResults, setSearchResults] = useState([])
   const [manualId, setManualId] = useState('')
   const matchAttemptedRef = useRef(false)
+  const wsRef = useRef(null)
+  const reconnectTimer = useRef(null)
+
+  // Close WS on unmount or unifiedId change
+  const closeWs = useCallback(() => {
+    if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null }
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
+    setWsConnected(false)
+  }, [])
+
+  // Connect WebSocket
+  const connectWs = useCallback((uid) => {
+    closeWs()
+    const ws = createOrderBookSocket(uid, {
+      onSnapshot: (data) => {
+        setOrderBookData({ unified_id: data.unified_id, display_name: data.display_name, markets: data.markets })
+        setLastUpdate(new Date())
+      },
+      onBookUpdate: (data) => {
+        setOrderBookData(prev => {
+          if (!prev) return prev
+          const pmEvents = [...(prev.markets.polymarket || [])]
+          // Find matching outcome and update its order_book
+          for (let i = 0; i < pmEvents.length; i++) {
+            const ev = pmEvents[i]
+            if (ev.outcome === data.outcome || ev.event_title === data.title) {
+              pmEvents[i] = { ...ev, order_book: { bids: data.bids, asks: data.asks } }
+              break
+            }
+          }
+          return { ...prev, markets: { ...prev.markets, polymarket: pmEvents } }
+        })
+        setLastUpdate(new Date())
+      },
+      onPriceChange: (data) => {
+        setOrderBookData(prev => {
+          if (!prev) return prev
+          const pmEvents = [...(prev.markets.polymarket || [])]
+          for (let i = 0; i < pmEvents.length; i++) {
+            if (pmEvents[i].outcome === data.outcome) {
+              pmEvents[i] = { ...pmEvents[i], last_price: parseFloat(data.price) || pmEvents[i].last_price }
+              break
+            }
+          }
+          return { ...prev, markets: { ...prev.markets, polymarket: pmEvents } }
+        })
+        setLastUpdate(new Date())
+      },
+      onTrade: (data) => {
+        setLastUpdate(new Date())
+      },
+      onKalshiUpdate: (data) => {
+        setOrderBookData(prev => {
+          if (!prev) return prev
+          return { ...prev, markets: { ...prev.markets, kalshi: data.events } }
+        })
+        setLastUpdate(new Date())
+      },
+      onOpen: () => setWsConnected(true),
+      onClose: () => {
+        setWsConnected(false)
+        // Auto-reconnect after 3s
+        reconnectTimer.current = setTimeout(() => connectWs(uid), 3000)
+      },
+      onError: (msg) => console.error('[ws]', msg),
+    })
+    wsRef.current = ws
+  }, [closeWs])
 
   // Load mapping
   useEffect(() => {
     setOrderBookData(null)
     matchAttemptedRef.current = false
+    closeWs()
     fetchEventMapping(unifiedId).then(setMapping)
-  }, [unifiedId])
+    return () => closeWs()
+  }, [unifiedId, closeWs])
 
-  // Auto-match unlinked markets on mount, then load order books
+  // Auto-match then connect WS
   useEffect(() => {
     if (!mapping) return
     const otherMarkets = markets.filter(m => m !== 'polymarket')
     const unlinked = otherMarkets.filter(m => !mapping.mappings[m])
 
-    const doAutoMatchAndLoad = async () => {
+    const doAutoMatchAndConnect = async () => {
       if (unlinked.length > 0 && !matchAttemptedRef.current) {
         matchAttemptedRef.current = true
         setAutoMatching(true)
         try {
-          for (const m of unlinked) {
-            await autoMatchMarket(m)
-          }
+          for (const m of unlinked) await autoMatchMarket(m)
           const updated = await fetchEventMapping(unifiedId)
           setMapping(updated)
           onMappingChange()
-        } catch (e) {
-          console.error('Auto-match failed:', e)
-        } finally {
-          setAutoMatching(false)
-        }
+        } catch (e) { console.error('Auto-match failed:', e) }
+        finally { setAutoMatching(false) }
       }
-      // Load order books
-      setLoadingOB(true)
-      try {
-        const data = await fetchOrderBooks(unifiedId)
-        setOrderBookData(data)
-      } catch (e) {
-        console.error('Failed to load order books:', e)
-      } finally {
-        setLoadingOB(false)
-      }
+      // Connect WebSocket for real-time data
+      connectWs(unifiedId)
     }
-    doAutoMatchAndLoad()
+    doAutoMatchAndConnect()
   }, [mapping?.unified_id])
 
   const otherMarkets = markets.filter(m => m !== 'polymarket')
 
   useEffect(() => {
-    if (otherMarkets.length > 0 && !selectedMarket) {
-      setSelectedMarket(otherMarkets[0])
-    }
+    if (otherMarkets.length > 0 && !selectedMarket) setSelectedMarket(otherMarkets[0])
   }, [markets])
 
   const handleSearch = async () => {
     if (!selectedMarket) return
-    const results = await searchMarketEvents(selectedMarket, searchQuery)
-    setSearchResults(results)
+    setSearchResults(await searchMarketEvents(selectedMarket, searchQuery))
   }
 
   const handleAddMapping = async (marketEventId) => {
     await addMarketMapping(unifiedId, selectedMarket, marketEventId)
-    setSearchResults([])
-    setManualId('')
-    setAddingMarket(false)
+    setSearchResults([]); setManualId(''); setAddingMarket(false)
     const updated = await fetchEventMapping(unifiedId)
     setMapping(updated)
     onMappingChange()
-    // Reload order books
-    setLoadingOB(true)
-    try {
-      const data = await fetchOrderBooks(unifiedId)
-      setOrderBookData(data)
-    } catch (e) { console.error(e) }
-    finally { setLoadingOB(false) }
+    // Reconnect WS to pick up new market
+    connectWs(unifiedId)
   }
 
   const handleRemove = async (marketName) => {
@@ -116,8 +164,13 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         <h2>{mapping.display_name}</h2>
         <div className="detail-title-meta">
           {mapping.event_time && <span className="detail-time">🕐 {new Date(mapping.event_time).toLocaleString()}</span>}
-          {autoMatching && <span className="auto-match-status">🔄 Auto-matching markets...</span>}
-          {loadingOB && <span className="auto-match-status">📊 Loading order books...</span>}
+          {wsConnected ? (
+            <span className="live-dot">● LIVE</span>
+          ) : (
+            <span className="auto-match-status">○ Connecting...</span>
+          )}
+          {lastUpdate && <span className="timestamp">Updated: {lastUpdate.toLocaleTimeString()}</span>}
+          {autoMatching && <span className="auto-match-status">🔄 Auto-matching...</span>}
         </div>
       </div>
 
@@ -165,9 +218,9 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         )}
       </div>
 
-      {/* Order Books - one market per row, outcomes horizontal */}
-      {!loadingOB && !orderBookData && !autoMatching && (
-        <p className="empty">No order book data available.</p>
+      {/* Order Books */}
+      {!orderBookData && !autoMatching && (
+        <p className="empty">{wsConnected ? 'Waiting for data...' : 'Connecting...'}</p>
       )}
 
       {marketNames.map(mname => {
@@ -202,7 +255,6 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         )
       })}
 
-      {/* Liquidity summary */}
       {marketNames.length >= 2 && orderBookData && <LiquiditySummary data={orderBookData} />}
     </div>
   )

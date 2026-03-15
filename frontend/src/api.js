@@ -56,10 +56,41 @@ export async function autoMatchAll() {
   return res.json()
 }
 
-export function createLiveSocket(unifiedId, onMessage) {
+export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onError, onOpen, onClose }) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const ws = new WebSocket(`${proto}://${window.location.host}/ws/live/${unifiedId}`)
-  ws.onmessage = (e) => onMessage(JSON.parse(e.data))
-  ws.onerror = (e) => console.error('WS error', e)
+  const ws = new WebSocket(`${proto}://${window.location.host}/ws/orderbooks/${unifiedId}`)
+
+  ws.onopen = () => {
+    if (onOpen) onOpen()
+    // keep-alive ping every 30s
+    ws._pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send('ping')
+    }, 30000)
+  }
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data)
+    switch (data.type) {
+      case 'snapshot': if (onSnapshot) onSnapshot(data); break
+      case 'book_update': if (onBookUpdate) onBookUpdate(data); break
+      case 'price_change': if (onPriceChange) onPriceChange(data); break
+      case 'trade': if (onTrade) onTrade(data); break
+      case 'kalshi_update': if (onKalshiUpdate) onKalshiUpdate(data); break
+      case 'error': if (onError) onError(data.message); break
+      case 'pong': break
+      default: console.log('[ws] unknown message type:', data.type)
+    }
+  }
+
+  ws.onerror = (e) => {
+    console.error('WS error', e)
+    if (onError) onError('WebSocket connection error')
+  }
+
+  ws.onclose = () => {
+    if (ws._pingInterval) clearInterval(ws._pingInterval)
+    if (onClose) onClose()
+  }
+
   return ws
 }

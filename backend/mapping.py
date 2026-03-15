@@ -20,6 +20,13 @@ GENERIC_TAGS = {
     'card','golden boot','most valuable player','mvp',
     'man of the match','player of the match','motm','potm',
     'transfer','sea',
+    # 非联赛的专有名词 tag
+    'Cristiano Ronaldo','Lionel Messi','Kylian Mbappe','Erling Haaland',
+    'Neymar','Mohamed Salah','Lamine Yamal','David Beckham',
+    'manchester united','manchester','Manu','Tottenham',
+    'Manchester City','Chelsea','Arsenal','Liverpool',
+    'Barcelona','Real Madrid','Bayern Munich','PSG',
+    'mexico','world cup','FIFA World Cup',
 }
 TAG_NORMALIZE = {
     'Premier League':'EPL','Champions League':'UCL',
@@ -28,15 +35,51 @@ TAG_NORMALIZE = {
     'Europa Conference League':'UECL','Carabao Cup':'EFL Cup',
 }
 
+# 已知的足球联赛 tag（白名单）
+KNOWN_LEAGUES = {
+    'EPL','UCL','UEL','UWCL','UECL','EFL Cup','FA Cup',
+    'La Liga','La Liga 2','Ligue 1','Ligue 2','Serie A','Serie B',
+    'Bundesliga','Bundesliga 2','Eredivisie','Primeira Liga',
+    'MLS','Liga MX','Brazil Serie A','Argentina Primera División',
+    'Saudi Professional League','Chinese Super League',
+    'Japan J League','Japan J2 League','K-league',
+    'Australian A-League','Indian Super League',
+    'Scottish Premiership','EFL Championship',
+    'Norway Eliteserien','Denmark Superliga','Süper Lig',
+    'Russian Premier League','Ukraine Premier Liha',
+    'FIFA World Cup','Fifa Friendly','FIFA',
+    'UEF Qualifiers','Club World Cup',
+    'Premier League','Champions League','Europa League',
+    "Women's Champions League",'UEFA Europa League',
+    'UEFA Conference League','Europa Conference League','Carabao Cup',
+}
+
 
 def _get_league_tag(tags: list[str]) -> str:
     for t in tags:
         if t in GENERIC_TAGS:
             continue
-        if t and t[0].islower() and ' League' not in t and ' Cup' not in t:
-            continue
-        return TAG_NORMALIZE.get(t, t)
+        normalized = TAG_NORMALIZE.get(t, t)
+        if normalized in KNOWN_LEAGUES:
+            return normalized
     return 'Other'
+
+
+def _is_match_event(title: str) -> bool:
+    """判断是否是真正的比赛事件（Team A vs Team B 格式）"""
+    import re
+    # 包含 vs/v/@/- 分隔的两支队伍
+    if re.search(r'\s+(?:vs\.?|v\.?|@)\s+', title, re.IGNORECASE):
+        return True
+    # 联赛冠军/降级/排名类事件也保留
+    keywords = ['winner', 'champion', 'relegat', 'top ', 'qualify', 'advance',
+                'most ', 'golden boot', 'clean sheet', 'total goals',
+                'first half', 'spread', 'over', 'under']
+    title_lower = title.lower()
+    for kw in keywords:
+        if kw in title_lower:
+            return True
+    return False
 
 
 def _extract_tags(pm_data: dict) -> list[str]:

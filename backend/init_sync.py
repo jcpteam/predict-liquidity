@@ -22,6 +22,12 @@ GENERIC_TAGS = {
     'card','golden boot','most valuable player','mvp',
     'man of the match','player of the match','motm','potm',
     'transfer','sea',
+    'Cristiano Ronaldo','Lionel Messi','Kylian Mbappe','Erling Haaland',
+    'Neymar','Mohamed Salah','Lamine Yamal','David Beckham',
+    'manchester united','manchester','Manu','Tottenham',
+    'Manchester City','Chelsea','Arsenal','Liverpool',
+    'Barcelona','Real Madrid','Bayern Munich','PSG',
+    'mexico','world cup','FIFA World Cup',
 }
 TAG_NORMALIZE = {
     'Premier League':'EPL','Champions League':'UCL',
@@ -29,15 +35,45 @@ TAG_NORMALIZE = {
     'UEFA Europa League':'UEL','UEFA Conference League':'UECL',
     'Europa Conference League':'UECL','Carabao Cup':'EFL Cup',
 }
+KNOWN_LEAGUES = {
+    'EPL','UCL','UEL','UWCL','UECL','EFL Cup','FA Cup',
+    'La Liga','La Liga 2','Ligue 1','Ligue 2','Serie A','Serie B',
+    'Bundesliga','Bundesliga 2','Eredivisie','Primeira Liga',
+    'MLS','Liga MX','Brazil Serie A','Argentina Primera División',
+    'Saudi Professional League','Chinese Super League',
+    'Japan J League','Japan J2 League','K-league',
+    'Australian A-League','Indian Super League',
+    'Scottish Premiership','EFL Championship',
+    'Norway Eliteserien','Denmark Superliga','Süper Lig',
+    'Russian Premier League','Ukraine Premier Liha',
+    'FIFA World Cup','Fifa Friendly','FIFA',
+    'UEF Qualifiers','Club World Cup',
+    'Premier League','Champions League','Europa League',
+    "Women's Champions League",'UEFA Europa League',
+    'UEFA Conference League','Europa Conference League','Carabao Cup',
+}
 
 def get_league_tag(tags):
     for t in tags:
         if t in GENERIC_TAGS:
             continue
-        if t and t[0].islower() and ' League' not in t and ' Cup' not in t:
-            continue
-        return TAG_NORMALIZE.get(t, t)
+        normalized = TAG_NORMALIZE.get(t, t)
+        if normalized in KNOWN_LEAGUES:
+            return normalized
     return 'Other'
+
+def is_match_event(title):
+    import re
+    if re.search(r'\s+(?:vs\.?|v\.?|@)\s+', title, re.IGNORECASE):
+        return True
+    keywords = ['winner', 'champion', 'relegat', 'top ', 'qualify', 'advance',
+                'most ', 'golden boot', 'clean sheet', 'total goals',
+                'first half', 'spread', 'over', 'under']
+    title_lower = title.lower()
+    for kw in keywords:
+        if kw in title_lower:
+            return True
+    return False
 
 def extract_tags(pm_data):
     tags = []
@@ -76,60 +112,13 @@ def main():
     cur = conn.cursor()
     print(f"  ✓ 连接成功 ({time.time()-t0:.1f}s)")
 
-    # 1. 建表
-    print("\n[1/4] 创建表...")
-    cur.execute("DROP TABLE IF EXISTS market_mappings")
-    cur.execute("DROP TABLE IF EXISTS events")
-    cur.execute("DROP TABLE IF EXISTS leagues")
+    # 1. 清理旧数据（保留表结构和 kalshi 映射）
+    print("\n[1/4] 清理旧事件数据...")
+    cur.execute("DELETE FROM events")
+    cur.execute("DELETE FROM market_mappings WHERE market_name = 'polymarket'")
+    cur.execute("DELETE FROM leagues")
     conn.commit()
-    print("  旧表已删除")
-
-    cur.execute("""
-        CREATE TABLE events (
-            unified_id VARCHAR(100) PRIMARY KEY,
-            display_name VARCHAR(500) NOT NULL,
-            sport VARCHAR(50) DEFAULT 'soccer',
-            league VARCHAR(200) DEFAULT 'Other',
-            event_time DATETIME NULL,
-            end_date DATETIME NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            image VARCHAR(1000) NULL,
-            liquidity VARCHAR(50) NULL,
-            volume VARCHAR(50) NULL,
-            volume_24hr VARCHAR(50) NULL,
-            market_count INT DEFAULT 0,
-            tags_json TEXT NULL,
-            polymarket_data_json LONGTEXT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_league (league),
-            INDEX idx_active (is_active)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """)
-
-    cur.execute("""
-        CREATE TABLE market_mappings (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            unified_id VARCHAR(100) NOT NULL,
-            market_name VARCHAR(100) NOT NULL,
-            market_event_id VARCHAR(500) NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_unified (unified_id),
-            UNIQUE KEY uq_mapping_event_market (unified_id, market_name)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """)
-
-    cur.execute("""
-        CREATE TABLE leagues (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(200) UNIQUE NOT NULL,
-            display_name VARCHAR(200) NOT NULL,
-            event_count INT DEFAULT 0,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """)
-    conn.commit()
-    print("  ✓ 表创建完成")
+    print("  ✓ 旧数据已清理（保留 kalshi 映射）")
 
     # 2. 拉取 Polymarket 足球赛事
     print("\n[2/4] 从 Polymarket 拉取足球赛事...")
@@ -183,10 +172,24 @@ def main():
             eid = str(ev.get("id", ""))
             if not eid:
                 continue
-            tags = extract_tags(ev)
-            league = get_league_tag(tags)
+            title = ev.get("title", "")
+
+            # 跳过已关闭事件
+            if ev.get("closed") is True:
+                continue
+
+            # 跳过已结束事件
             end_date_raw = ev.get("endDate", "")
             end_date = parse_datetime(end_date_raw)
+            if end_date and end_date < datetime.now(timezone.utc):
+                continue
+
+            # 跳过非比赛事件
+            if not is_match_event(title):
+                continue
+
+            tags = extract_tags(ev)
+            league = get_league_tag(tags)
             end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S') if end_date else None
             event_time = parse_datetime(ev.get("startDate"))
             event_time_str = event_time.strftime('%Y-%m-%d %H:%M:%S') if event_time else None
