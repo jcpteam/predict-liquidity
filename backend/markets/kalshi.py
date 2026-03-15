@@ -152,34 +152,38 @@ class KalshiAdapter(BaseMarketAdapter):
 
     async def fetch_order_book(self, ticker: str, outcome: str = "") -> OrderBook | None:
         """获取单个 market 的 order book
-        Kalshi orderbook 返回 yes/no 两侧，价格单位为 cents (0-100)
+        Kalshi API 返回 orderbook_fp，包含 yes_dollars 和 no_dollars
+        价格为美元小数 (0.00-1.00)，size 为美元金额
         """
         try:
             resp = await self.client.get(
                 f"{self.BASE_URL}/markets/{ticker}/orderbook",
-                params={"depth": 20},
+                params={"depth": 50},
             )
             resp.raise_for_status()
-            data = resp.json().get("orderbook", {})
+            raw = resp.json()
+            # API 返回 orderbook_fp (不是 orderbook)
+            data = raw.get("orderbook_fp") or raw.get("orderbook") or {}
             bids = [
-                OrderLevel(price=float(b[0]) / 100, size=float(b[1]))
-                for b in data.get("yes", [])
+                OrderLevel(price=float(b[0]), size=float(b[1]))
+                for b in data.get("yes_dollars") or data.get("yes") or []
             ]
             asks = [
-                OrderLevel(price=float(a[0]) / 100, size=float(a[1]))
-                for a in data.get("no", [])
+                OrderLevel(price=float(a[0]), size=float(a[1]))
+                for a in data.get("no_dollars") or data.get("no") or []
             ]
+            # yes_dollars 按价格降序排列 (最高出价在前)
+            bids.sort(key=lambda x: x.price, reverse=True)
+            # no_dollars 按价格升序排列 (最低要价在前)
+            asks.sort(key=lambda x: x.price)
             return OrderBook(bids=bids, asks=asks, timestamp=datetime.now(timezone.utc))
         except Exception as e:
             print(f"[kalshi] fetch_order_book({ticker}) error: {e}")
             return None
 
     async def fetch_event(self, event_ticker: str) -> list[MarketEvent]:
-        """获取 event 下所有 markets 的详情和 order book
-        event_ticker 可以是 event ticker 或单个 market ticker
-        """
+        """获取 event 下所有 markets 的详情和 order book（并发获取 orderbook）"""
         try:
-            # 先尝试作为 event ticker 获取
             resp = await self.client.get(
                 f"{self.BASE_URL}/events/{event_ticker}",
                 params={"with_nested_markets": "true"},
@@ -189,37 +193,45 @@ class KalshiAdapter(BaseMarketAdapter):
             markets = ev.get("markets", [])
 
             if not markets:
-                # 可能传入的是单个 market ticker，回退到单 market 查询
                 return await self._fetch_single_market(event_ticker)
 
+            # 并发获取所有 market 的 orderbook
+            tickers = [m.get("ticker", "") for m in markets]
+            obs = await asyncio.gather(
+                *[self.fetch_order_book(t) for t in tickers],
+                return_exceptions=True,
+            )
+
             results = []
-            for m in markets:
-                ticker = m.get("ticker", "")
+            for i, m in enumerate(markets):
                 title = m.get("title", ev.get("title", ""))
                 subtitle = m.get("subtitle", m.get("yes_sub_title", ""))
                 display = f"{title} - {subtitle}" if subtitle else title
 
-                ob = await self.fetch_order_book(ticker)
-                last_price = m.get("last_price")
-                if last_price is not None:
-                    last_price = float(last_price) / 100
+                ob = obs[i] if not isinstance(obs[i], Exception) else None
 
-                volume = m.get("volume")
-                vol_24h = m.get("volume_24h")
+                last_price = m.get("last_price_dollars")
+                if last_price is not None:
+                    last_price = float(last_price)
+                else:
+                    lp_old = m.get("last_price")
+                    last_price = float(lp_old) / 100 if lp_old is not None else None
+
+                vol_24h = m.get("volume_24h_fp") or m.get("volume_24h")
+                vol = m.get("volume_fp") or m.get("volume")
 
                 results.append(MarketEvent(
-                    market_id=ticker,
+                    market_id=tickers[i],
                     market_name=self.name,
                     event_title=display,
                     outcome=m.get("yes_sub_title", "Yes"),
                     order_book=ob,
                     last_price=last_price,
-                    volume_24h=float(vol_24h) if vol_24h else (float(volume) if volume else None),
+                    volume_24h=float(vol_24h) if vol_24h else (float(vol) if vol else None),
                 ))
             return results
         except Exception as e:
             print(f"[kalshi] fetch_event({event_ticker}) error: {e}")
-            # 回退到单 market
             return await self._fetch_single_market(event_ticker)
 
     async def _fetch_single_market(self, ticker: str) -> list[MarketEvent]:

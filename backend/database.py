@@ -49,7 +49,11 @@ DATABASE_URL = (
     "?charset=utf8mb4"
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_size=10, max_overflow=20)
+engine = create_async_engine(
+    DATABASE_URL, echo=False, pool_size=5, max_overflow=10,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 30},
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -108,10 +112,13 @@ class DBMapping(Base):
 
 
 async def init_db():
-    """创建所有表"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("[db] Tables initialized")
+    """测试数据库连接（表已通过 init_sync.py 创建）"""
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        print("[db] Connection OK")
+    except Exception as e:
+        print(f"[db] Connection failed: {e}, will retry on first request")
 
 
 async def close_db():
