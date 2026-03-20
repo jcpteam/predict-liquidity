@@ -76,6 +76,7 @@ export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onP
       case 'price_change': if (onPriceChange) onPriceChange(data); break
       case 'trade': if (onTrade) onTrade(data); break
       case 'kalshi_update': if (onKalshiUpdate) onKalshiUpdate(data); break
+      case 'betfair_update': if (onBetfairUpdate) onBetfairUpdate(data); break
       case 'error': if (onError) onError(data.message); break
       case 'pong': break
       default: console.log('[ws] unknown message type:', data.type)

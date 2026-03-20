@@ -82,6 +82,13 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         })
         setLastUpdate(new Date())
       },
+      onBetfairUpdate: (data) => {
+        setOrderBookData(prev => {
+          if (!prev) return prev
+          return { ...prev, markets: { ...prev.markets, betfair: data.events } }
+        })
+        setLastUpdate(new Date())
+      },
       onOpen: () => setWsConnected(true),
       onClose: () => {
         setWsConnected(false)

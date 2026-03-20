@@ -83,7 +83,7 @@ async def list_league_events(league: str):
 async def sync_events():
     sync_result = await _do_sync_polymarket()
     expired = await mapping_store.cleanup_expired()
-    # 自动匹配 kalshi
+    # 自动匹配 kalshi + betfair
     matcher = AutoMatcher(mapping_store, registry)
     match_results = await matcher.auto_match_all()
     return {
@@ -244,6 +244,14 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
         if kalshi_adapter:
             tasks.append(asyncio.create_task(
                 _kalshi_poll_stream(websocket, mapping, kalshi_adapter, stop_event)
+            ))
+
+    # Betfair 轮询（每 10 秒，节省 API quota）
+    if "betfair" in mapping.mappings:
+        betfair_adapter = registry.get("betfair")
+        if betfair_adapter:
+            tasks.append(asyncio.create_task(
+                _betfair_poll_stream(websocket, mapping, betfair_adapter, stop_event)
             ))
 
     # 监听客户端断开
@@ -441,6 +449,36 @@ async def _kalshi_poll_stream(websocket: WebSocket, mapping, kalshi_adapter, sto
         except Exception as e:
             print(f"[ws-kalshi] Poll error: {e}")
             await asyncio.sleep(5)
+
+
+async def _betfair_poll_stream(websocket: WebSocket, mapping, betfair_adapter, stop_event):
+    """Betfair orderbook 轮询（每 10 秒），通过 The Odds API"""
+    betfair_event_id = mapping.mappings.get("betfair", "")
+    if not betfair_event_id:
+        return
+
+    while not stop_event.is_set():
+        try:
+            await asyncio.sleep(10)
+            if stop_event.is_set():
+                break
+
+            events = await betfair_adapter.fetch_event(betfair_event_id)
+            market_data = [ev.model_dump(mode="json") for ev in events]
+
+            await websocket.send_json({
+                "type": "betfair_update",
+                "market": "betfair",
+                "events": market_data,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except WebSocketDisconnect:
+            return
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            print(f"[ws-betfair] Poll error: {e}")
+            await asyncio.sleep(10)
 
 
 # ── 静态文件 ──

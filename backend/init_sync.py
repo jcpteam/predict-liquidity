@@ -112,16 +112,16 @@ def main():
     cur = conn.cursor()
     print(f"  ✓ 连接成功 ({time.time()-t0:.1f}s)")
 
-    # 1. 清理旧数据（保留表结构和 kalshi 映射）
-    print("\n[1/4] 清理旧事件数据...")
+    # 1. 清理旧数据（保留表结构和 kalshi/betfair 映射）
+    print("\n[1/5] 清理旧事件数据...")
     cur.execute("DELETE FROM events")
     cur.execute("DELETE FROM market_mappings WHERE market_name = 'polymarket'")
     cur.execute("DELETE FROM leagues")
     conn.commit()
-    print("  ✓ 旧数据已清理（保留 kalshi 映射）")
+    print("  ✓ 旧数据已清理（保留 kalshi/betfair 映射）")
 
     # 2. 拉取 Polymarket 足球赛事
-    print("\n[2/4] 从 Polymarket 拉取足球赛事...")
+    print("\n[2/5] 从 Polymarket 拉取足球赛事...")
     import asyncio
     from markets.registry import MarketRegistry
 
@@ -136,7 +136,7 @@ def main():
     print(f"  获取到 {len(events)} 个赛事")
 
     # 3. 批量写入数据库
-    print("\n[3/4] 批量写入数据库...")
+    print("\n[3/5] 批量写入数据库...")
     now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     new_count = 0
 
@@ -236,17 +236,59 @@ def main():
     conn.commit()
     print("  ✓ 联赛表已更新")
 
-    # 4. 汇总 (Kalshi 自动匹配可通过页面按钮触发)
+    # 4. 自动匹配 Kalshi + Betfair
+    print("\n[4/5] 自动匹配 Kalshi & Betfair 映射...")
+    import asyncio
+    from automatch import AutoMatcher
+    from mapping import EventMappingStore
+    from markets.registry import MarketRegistry
+
+    async def do_automatch():
+        r = MarketRegistry.create_default()
+        store = EventMappingStore()
+        matcher = AutoMatcher(store, r)
+
+        # Kalshi
+        print("  [kalshi] 开始自动匹配...")
+        try:
+            result = await matcher.auto_match_market("kalshi")
+            print(f"  [kalshi] matched={result.get('matched',0)}, skipped={result.get('skipped',0)}")
+        except Exception as e:
+            print(f"  [kalshi] 匹配失败: {e}")
+
+        # Betfair (通过 The Odds API)
+        odds_key = os.getenv("ODDS_API_KEY", "")
+        if odds_key:
+            print("  [betfair] 开始自动匹配...")
+            try:
+                result = await matcher.auto_match_market("betfair")
+                print(f"  [betfair] matched={result.get('matched',0)}, skipped={result.get('skipped',0)}")
+            except Exception as e:
+                print(f"  [betfair] 匹配失败: {e}")
+        else:
+            print("  [betfair] 跳过 (未配置 ODDS_API_KEY)")
+
+        await r.close_all()
+
+    asyncio.run(do_automatch())
+
+    # 5. 汇总
     cur.execute("SELECT COUNT(*) FROM events WHERE is_active = TRUE")
     active = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM leagues")
     league_count = cur.fetchone()[0]
 
+    cur.execute("SELECT COUNT(*) FROM market_mappings WHERE market_name = 'kalshi'")
+    kalshi_maps = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM market_mappings WHERE market_name = 'betfair'")
+    betfair_maps = cur.fetchone()[0]
+
     print("\n" + "=" * 60)
     print(f"  初始化完成! (总耗时 {time.time()-t0:.1f}s)")
     print(f"  活跃赛事: {active}")
     print(f"  联赛分组: {league_count}")
-    print(f"  Kalshi 自动匹配请通过页面 '🤖 Auto-Match Markets' 按钮触发")
+    print(f"  Kalshi 映射: {kalshi_maps}")
+    print(f"  Betfair 映射: {betfair_maps}")
     print("=" * 60)
 
     conn.close()
