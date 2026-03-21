@@ -62,23 +62,51 @@ class BetfairAdapter(BaseMarketAdapter):
             await self._login()
 
     async def _login(self):
-        """通过 Betfair SSO 获取 session token (非证书方式)"""
+        """通过 Betfair SSO 获取 session token (非证书方式, interactive login)"""
         try:
             resp = await self.client.post(
                 self.SSO_URL_SIMPLE,
-                data={"username": self.username, "password": self.password},
+                data=f"username={self.username}&password={self.password}",
                 headers={
                     "X-Application": self.app_key,
                     "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
                 },
+                follow_redirects=False,
             )
-            resp.raise_for_status()
-            data = resp.json()
-            if data.get("status") == "SUCCESS":
-                self.session_token = data["token"]
-                print(f"[betfair] Login OK, token={self.session_token[:20]}...")
+            # 如果返回 200 + JSON
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("status") == "SUCCESS":
+                    self.session_token = data["token"]
+                    print(f"[betfair] Login OK, token={self.session_token[:20]}...")
+                    return
+                else:
+                    print(f"[betfair] Login failed: {data.get('error', data)}")
+                    return
+
+            # 302 重定向说明 interactive login 不可用，尝试 certlogin 端点（无证书模式）
+            print(f"[betfair] Interactive login returned {resp.status_code}, trying certlogin...")
+            resp2 = await self.client.post(
+                self.SSO_URL,
+                data=f"username={self.username}&password={self.password}",
+                headers={
+                    "X-Application": self.app_key,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+                follow_redirects=False,
+            )
+            if resp2.status_code == 200:
+                data = resp2.json()
+                if data.get("loginStatus") == "SUCCESS" or data.get("status") == "SUCCESS":
+                    self.session_token = data.get("sessionToken", data.get("token", ""))
+                    print(f"[betfair] CertLogin OK, token={self.session_token[:20]}...")
+                    return
+                else:
+                    print(f"[betfair] CertLogin failed: {data}")
             else:
-                print(f"[betfair] Login failed: {data.get('error', data)}")
+                print(f"[betfair] CertLogin returned {resp2.status_code}: {resp2.text[:200]}")
         except Exception as e:
             print(f"[betfair] Login error: {e}")
 

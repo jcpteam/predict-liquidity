@@ -56,7 +56,7 @@ export async function autoMatchAll() {
   return res.json()
 }
 
-export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onError, onOpen, onClose }) {
+export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onBetfairUpdate, onError, onOpen, onClose }) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const ws = new WebSocket(`${proto}://${window.location.host}/ws/orderbooks/${unifiedId}`)
 
