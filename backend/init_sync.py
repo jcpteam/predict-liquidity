@@ -256,9 +256,9 @@ def main():
         except Exception as e:
             print(f"  [kalshi] 匹配失败: {e}")
 
-        # Betfair (通过 The Odds API)
-        odds_key = os.getenv("ODDS_API_KEY", "")
-        if odds_key:
+        # Betfair (通过 Betfair Exchange API)
+        betfair_key = os.getenv("BETFAIR_APP_KEY", "")
+        if betfair_key:
             print("  [betfair] 开始自动匹配...")
             try:
                 result = await matcher.auto_match_market("betfair")
@@ -266,7 +266,7 @@ def main():
             except Exception as e:
                 print(f"  [betfair] 匹配失败: {e}")
         else:
-            print("  [betfair] 跳过 (未配置 ODDS_API_KEY)")
+            print("  [betfair] 跳过 (未配置 BETFAIR_APP_KEY)")
 
         await r.close_all()
 

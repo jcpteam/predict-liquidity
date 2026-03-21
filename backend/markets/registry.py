@@ -39,6 +39,6 @@ class MarketRegistry:
         registry.register(PolymarketAdapter(api_key=configs.get("polymarket", {}).get("api_key")))
         registry.register(KalshiAdapter(api_key=configs.get("kalshi", {}).get("api_key")))
         import os
-        betfair_key = configs.get("betfair", {}).get("api_key") or os.getenv("ODDS_API_KEY", "")
+        betfair_key = configs.get("betfair", {}).get("api_key") or os.getenv("BETFAIR_APP_KEY", "")
         registry.register(BetfairAdapter(api_key=betfair_key))
         return registry

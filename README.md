@@ -52,9 +52,12 @@ cp backend/.env.example backend/.env
 | `db_name` | 数据库名 | ✅ |
 | `POLYMARKET_API_KEY` | Polymarket API key (公开数据无需) | ❌ |
 | `KALSHI_API_KEY` | Kalshi API key (公开数据无需) | ❌ |
-| `ODDS_API_KEY` | The Odds API key (Betfair 数据) | ⚠️ Betfair 需要 |
+| `BETFAIR_APP_KEY` | Betfair Application Key | ⚠️ Betfair 需要 |
+| `BETFAIR_USERNAME` | Betfair 账号用户名 | ⚠️ Betfair 需要 |
+| `BETFAIR_PASSWORD` | Betfair 账号密码 | ⚠️ Betfair 需要 |
+| `BETFAIR_SESSION_TOKEN` | Betfair Session Token (可选，留空自动登录) | ❌ |
 
-Betfair 数据通过 [The Odds API](https://the-odds-api.com) 获取，免费 tier 500 requests/month。注册后获取 API key 填入 `ODDS_API_KEY`。
+Betfair 需要在 [developer.betfair.com](https://developer.betfair.com) 注册开发者账号并申请 Application Key。
 
 ### 3. 初始化数据库（建表 + 数据同步）
 
@@ -154,7 +157,7 @@ export SYNC_INTERVAL_HOURS=6  # 默认 6 小时
 |------|----------|----------------|----------|
 | Polymarket | Gamma API (`tag_id=100350`) | CLOB WebSocket | WS 实时推送 |
 | Kalshi | REST API (`/series` + `/events`) | REST API (`/orderbook`) | 5 秒轮询 |
-| Betfair | The Odds API (`/events`) | The Odds API (`/odds`) | 10 秒轮询 |
+| Betfair | REST API (`listMarketCatalogue`) | Stream API (`stream-api.betfair.com:443`) | SSL TCP 实时流 (回退: 10s REST 轮询) |
 
 ## 架构
 
