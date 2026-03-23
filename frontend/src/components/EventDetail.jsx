@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, autoMatchMarket, createOrderBookSocket } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
 
-const MARKET_ORDER = ['polymarket', 'kalshi', 'betfair']
+const MARKET_ORDER = ['polymarket', 'kalshi', 'betfair', 'btx']
 
 function sortMarketNames(names) {
   return [...names].sort((a, b) => {
@@ -86,6 +86,13 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         setOrderBookData(prev => {
           if (!prev) return prev
           return { ...prev, markets: { ...prev.markets, betfair: data.events } }
+        })
+        setLastUpdate(new Date())
+      },
+      onBtxUpdate: (data) => {
+        setOrderBookData(prev => {
+          if (!prev) return prev
+          return { ...prev, markets: { ...prev.markets, btx: data.events } }
         })
         setLastUpdate(new Date())
       },

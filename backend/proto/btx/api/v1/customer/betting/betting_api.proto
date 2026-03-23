@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package btx.api.v1.customer.betting;
+
+option java_multiple_files = true;
+
+// BettingApi service - ex3.io production gRPC API
+service BettingApi {
+  // Stream real-time market data (server streaming)
+  rpc StreamMarketData (StreamMarketDataRequest) returns (stream MarketDataUpdate);
+
+  // Place orders (up to 100 per call)
+  rpc PlaceOrders (PlaceOrdersRequest) returns (PlaceOrdersResponse);
+
+  // Cancel orders (up to 50 per call)
+  rpc CancelOrders (CancelOrdersRequest) returns (CancelOrdersResponse);
+
+  // Update auto-cancel properties
+  rpc UpdateAutoCancel (UpdateAutoCancelRequest) returns (UpdateAutoCancelResponse);
+}
+
+// ── StreamMarketData ──
+
+message StreamMarketDataRequest {
+  repeated string market_ids = 1;
+  // Optional: filter by event IDs
+  repeated string event_ids = 2;
+}
+
+message MarketDataUpdate {
+  string market_id = 1;
+  string event_id = 2;
+  string event_name = 3;
+  string market_type = 4;
+  repeated RunnerData runners = 5;
+  double total_matched = 6;
+  string status = 7;  // OPEN, SUSPENDED, CLOSED
+  int64 timestamp = 8;
+}
+
+message RunnerData {
+  string runner_id = 1;
+  string runner_name = 2;
+  repeated PriceLevel back_prices = 3;  // available to back (bids)
+  repeated PriceLevel lay_prices = 4;   // available to lay (asks)
+  double last_traded_price = 5;
+  double total_matched = 6;
+  string status = 7;  // ACTIVE, REMOVED, WINNER, LOSER
+}
+
+message PriceLevel {
+  double price = 1;
+  double size = 2;
+}
+
+// ── PlaceOrders (stub - not used for orderbook reading) ──
+
+message PlaceOrdersRequest {
+  string market_id = 1;
+  repeated PlaceInstruction instructions = 2;
+}
+
+message PlaceInstruction {
+  string runner_id = 1;
+  string side = 2;  // BACK or LAY
+  double price = 3;
+  double size = 4;
+}
+
+message PlaceOrdersResponse {
+  string status = 1;
+  repeated OrderResult results = 2;
+}
+
+message OrderResult {
+  string order_id = 1;
+  string status = 2;
+}
+
+// ── CancelOrders (stub) ──
+
+message CancelOrdersRequest {
+  string market_id = 1;
+  repeated string order_ids = 2;
+}
+
+message CancelOrdersResponse {
+  string status = 1;
+}
+
+// ── UpdateAutoCancel (stub) ──
+
+message UpdateAutoCancelRequest {
+  string order_id = 1;
+  int64 timeout_seconds = 2;
+}
+
+message UpdateAutoCancelResponse {
+  string status = 1;
+}

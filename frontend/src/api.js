@@ -56,7 +56,7 @@ export async function autoMatchAll() {
   return res.json()
 }
 
-export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onBetfairUpdate, onError, onOpen, onClose }) {
+export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onBetfairUpdate, onBtxUpdate, onError, onOpen, onClose }) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const ws = new WebSocket(`${proto}://${window.location.host}/ws/orderbooks/${unifiedId}`)
 
@@ -77,6 +77,7 @@ export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onP
       case 'trade': if (onTrade) onTrade(data); break
       case 'kalshi_update': if (onKalshiUpdate) onKalshiUpdate(data); break
       case 'betfair_update': if (onBetfairUpdate) onBetfairUpdate(data); break
+      case 'btx_update': if (onBtxUpdate) onBtxUpdate(data); break
       case 'error': if (onError) onError(data.message); break
       case 'pong': break
       default: console.log('[ws] unknown message type:', data.type)

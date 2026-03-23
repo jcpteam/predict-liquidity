@@ -4,6 +4,7 @@ from .base import BaseMarketAdapter
 from .polymarket import PolymarketAdapter
 from .kalshi import KalshiAdapter
 from .betfair import BetfairAdapter
+from .btx import BTXAdapter
 
 
 class MarketRegistry:
@@ -41,4 +42,5 @@ class MarketRegistry:
         import os
         betfair_key = configs.get("betfair", {}).get("api_key") or os.getenv("BETFAIR_APP_KEY", "")
         registry.register(BetfairAdapter(api_key=betfair_key))
+        registry.register(BTXAdapter())
         return registry

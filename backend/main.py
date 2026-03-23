@@ -254,6 +254,14 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
                 _betfair_poll_stream(websocket, mapping, betfair_adapter, stop_event)
             ))
 
+    # BTX gRPC 实时流
+    if "btx" in mapping.mappings:
+        btx_adapter = registry.get("btx")
+        if btx_adapter:
+            tasks.append(asyncio.create_task(
+                _btx_grpc_stream(websocket, mapping, btx_adapter, stop_event)
+            ))
+
     # 监听客户端断开
     try:
         while True:
@@ -572,6 +580,43 @@ async def _betfair_poll_stream(websocket: WebSocket, mapping, betfair_adapter, s
         except Exception as e:
             print(f"[ws-betfair] Poll error: {e}")
             await asyncio.sleep(10)
+
+
+async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_event):
+    """BTX gRPC StreamMarketData 实时推送 orderbook 数据"""
+    btx_market_id = mapping.mappings.get("btx", "")
+    if not btx_market_id:
+        return
+
+    while not stop_event.is_set():
+        try:
+            stream = await btx_adapter.stream_market_data([btx_market_id])
+            if stream is None:
+                # 无法连接，等待后重试
+                await asyncio.sleep(10)
+                continue
+
+            async for update in stream:
+                if stop_event.is_set():
+                    break
+                events = btx_adapter.parse_market_update(update)
+                if events:
+                    market_data = [ev.model_dump(mode="json") for ev in events]
+                    await websocket.send_json({
+                        "type": "btx_update",
+                        "market": "btx",
+                        "events": market_data,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+
+        except WebSocketDisconnect:
+            return
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            print(f"[ws-btx] Stream error: {e}")
+            if not stop_event.is_set():
+                await asyncio.sleep(10)
 
 
 # ── 静态文件 ──
