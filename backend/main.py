@@ -590,24 +590,24 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
 
     while not stop_event.is_set():
         try:
-            stream = await btx_adapter.stream_market_data([btx_market_id])
+            stream = await btx_adapter.stream_market_data(stream_prices=True)
             if stream is None:
-                # 无法连接，等待后重试
                 await asyncio.sleep(10)
                 continue
 
-            async for update in stream:
+            async for msg in stream:
                 if stop_event.is_set():
                     break
-                events = btx_adapter.parse_market_update(update)
-                if events:
-                    market_data = [ev.model_dump(mode="json") for ev in events]
-                    await websocket.send_json({
-                        "type": "btx_update",
-                        "market": "btx",
-                        "events": market_data,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                if msg.prices and msg.prices.market_prices:
+                    parsed = btx_adapter.parse_price_message(msg.prices)
+                    if btx_market_id in parsed:
+                        market_data = [ev.model_dump(mode="json") for ev in parsed[btx_market_id]]
+                        await websocket.send_json({
+                            "type": "btx_update",
+                            "market": "btx",
+                            "events": market_data,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        })
 
         except WebSocketDisconnect:
             return
