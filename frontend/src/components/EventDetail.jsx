@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, autoMatchMarket, createOrderBookSocket } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
 
-const MARKET_ORDER = ['polymarket', 'kalshi', 'betfair', 'btx']
+const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
 
 function sortMarketNames(names) {
   return [...names].sort((a, b) => {
@@ -119,7 +119,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   // Auto-match then connect WS
   useEffect(() => {
     if (!mapping) return
-    const otherMarkets = markets.filter(m => m !== 'polymarket')
+    const otherMarkets = markets.filter(m => m !== 'btx')
     const unlinked = otherMarkets.filter(m => !mapping.mappings[m])
 
     const doAutoMatchAndConnect = async () => {
@@ -140,7 +140,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     doAutoMatchAndConnect()
   }, [mapping?.unified_id])
 
-  const otherMarkets = markets.filter(m => m !== 'polymarket')
+  const otherMarkets = markets.filter(m => m !== 'btx')
 
   useEffect(() => {
     if (otherMarkets.length > 0 && !selectedMarket) setSelectedMarket(otherMarkets[0])
@@ -170,7 +170,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 
   if (!mapping) return <div className="detail-page"><p>Loading...</p></div>
 
-  const marketNames = orderBookData ? sortMarketNames(Object.keys(orderBookData.markets || {})) : []
+  const marketNames = orderBookData ? MARKET_ORDER : []
 
   return (
     <div className="detail-page">
@@ -196,7 +196,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
             <div key={name} className="linked-item">
               <span className="market-badge">{name}</span>
               <code>{id}</code>
-              {name !== 'polymarket' && (
+              {name !== 'btx' && (
                 <button className="btn-danger btn-sm" onClick={() => handleRemove(name)}>✕</button>
               )}
             </div>
@@ -239,15 +239,17 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 
       {marketNames.map(mname => {
         const events = orderBookData.markets[mname]
-        if (!events || events.length === 0) return null
-        const hasError = events.length === 1 && events[0].error
+        const hasData = events && events.length > 0
+        const hasError = hasData && events.length === 1 && events[0].error
         return (
           <div key={mname} className="market-row">
             <div className="market-row-header">
               <h3>{mname.toUpperCase()}</h3>
-              <span className="market-row-meta">{events.length} outcome{events.length > 1 ? 's' : ''}</span>
+              {hasData && <span className="market-row-meta">{events.length} outcome{events.length > 1 ? 's' : ''}</span>}
             </div>
-            {hasError ? (
+            {!hasData ? (
+              <div className="market-row-nodata">No Data</div>
+            ) : hasError ? (
               <p className="error">{events[0].error}</p>
             ) : (
               <div className="market-row-cards">

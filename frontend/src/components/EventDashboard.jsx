@@ -76,6 +76,7 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
                   {ev.volume_24hr != null && <span className="match-stat">24h: ${Number(ev.volume_24hr).toLocaleString()}</span>}
                 </div>
                 <div className="match-badges">
+                  {ev.is_active === false && <span className="market-badge-sm" style={{background:'#da363333',color:'#f85149'}}>ENDED</span>}
                   {ev.linked_markets.map(m => (
                     <span key={m} className="market-badge-sm">{m}</span>
                   ))}

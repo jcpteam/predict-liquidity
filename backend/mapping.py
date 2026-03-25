@@ -285,7 +285,7 @@ class EventMappingStore:
     async def get_mapping(self, unified_id: str) -> Optional[EventMapping]:
         async with async_session() as session:
             ev = await session.get(DBEvent, unified_id)
-            if not ev or not ev.is_active:
+            if not ev:
                 return None
             maps = (await session.execute(
                 select(DBMapping).where(DBMapping.unified_id == unified_id)
@@ -342,20 +342,10 @@ class EventMappingStore:
         return await self.get_mapping(unified_id)
 
     async def list_leagues(self) -> list[dict]:
-        """只返回包含三市场都匹配事件的联赛"""
+        """返回所有联赛（不过滤活跃状态和市场匹配）"""
         async with async_session() as session:
-            # 找出同时有 polymarket, kalshi, betfair 映射的 unified_id
-            from sqlalchemy import literal_column
-            subq = (
-                select(DBMapping.unified_id)
-                .where(DBMapping.market_name.in_(["polymarket", "kalshi", "betfair"]))
-                .group_by(DBMapping.unified_id)
-                .having(func.count(func.distinct(DBMapping.market_name)) == 3)
-            ).subquery()
-
             rows = (await session.execute(
                 select(DBEvent.league, func.count(DBEvent.unified_id))
-                .where(and_(DBEvent.is_active == True, DBEvent.unified_id.in_(select(subq.c.unified_id))))
                 .group_by(DBEvent.league)
                 .order_by(func.count(DBEvent.unified_id).desc())
             )).all()
@@ -368,10 +358,8 @@ class EventMappingStore:
                     DBEvent.unified_id, DBEvent.display_name, DBEvent.event_time,
                     DBEvent.end_date, DBEvent.league, DBEvent.liquidity,
                     DBEvent.volume_24hr, DBEvent.volume, DBEvent.image,
-                    DBEvent.market_count, DBEvent.tags_json,
-                ).where(
-                    and_(DBEvent.is_active == True, DBEvent.league == league)
-                )
+                    DBEvent.market_count, DBEvent.tags_json, DBEvent.is_active,
+                ).where(DBEvent.league == league)
             )).all()
 
             if not events:
@@ -389,14 +377,9 @@ class EventMappingStore:
             for uid, mname in maps:
                 mapping_dict.setdefault(uid, []).append(mname)
 
-            REQUIRED_MARKETS = {"polymarket", "kalshi", "betfair"}
-
             result = []
             for ev in events:
                 linked = mapping_dict.get(ev.unified_id, [])
-                # 只展示三个市场都匹配到的事件
-                if not REQUIRED_MARKETS.issubset(set(linked)):
-                    continue
                 tags = []
                 if ev.tags_json:
                     try:
@@ -416,6 +399,7 @@ class EventMappingStore:
                     "market_count": ev.market_count,
                     "tags": tags,
                     "linked_markets": linked,
+                    "is_active": ev.is_active,
                 })
             return result
 
