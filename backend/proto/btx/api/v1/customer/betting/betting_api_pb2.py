@@ -24,38 +24,63 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-btx/api/v1/customer/betting/betting_api.proto\x12\x1b\x62tx.api.v1.customer.betting\"@\n\x17StreamMarketDataRequest\x12\x12\n\nmarket_ids\x18\x01 \x03(\t\x12\x11\n\tevent_ids\x18\x02 \x03(\t\"\xd4\x01\n\x10MarketDataUpdate\x12\x11\n\tmarket_id\x18\x01 \x01(\t\x12\x10\n\x08\x65vent_id\x18\x02 \x01(\t\x12\x12\n\nevent_name\x18\x03 \x01(\t\x12\x13\n\x0bmarket_type\x18\x04 \x01(\t\x12\x38\n\x07runners\x18\x05 \x03(\x0b\x32\'.btx.api.v1.customer.betting.RunnerData\x12\x15\n\rtotal_matched\x18\x06 \x01(\x01\x12\x0e\n\x06status\x18\x07 \x01(\t\x12\x11\n\ttimestamp\x18\x08 \x01(\x03\"\xf1\x01\n\nRunnerData\x12\x11\n\trunner_id\x18\x01 \x01(\t\x12\x13\n\x0brunner_name\x18\x02 \x01(\t\x12<\n\x0b\x62\x61\x63k_prices\x18\x03 \x03(\x0b\x32\'.btx.api.v1.customer.betting.PriceLevel\x12;\n\nlay_prices\x18\x04 \x03(\x0b\x32\'.btx.api.v1.customer.betting.PriceLevel\x12\x19\n\x11last_traded_price\x18\x05 \x01(\x01\x12\x15\n\rtotal_matched\x18\x06 \x01(\x01\x12\x0e\n\x06status\x18\x07 \x01(\t\")\n\nPriceLevel\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x0c\n\x04size\x18\x02 \x01(\x01\"l\n\x12PlaceOrdersRequest\x12\x11\n\tmarket_id\x18\x01 \x01(\t\x12\x43\n\x0cinstructions\x18\x02 \x03(\x0b\x32-.btx.api.v1.customer.betting.PlaceInstruction\"P\n\x10PlaceInstruction\x12\x11\n\trunner_id\x18\x01 \x01(\t\x12\x0c\n\x04side\x18\x02 \x01(\t\x12\r\n\x05price\x18\x03 \x01(\x01\x12\x0c\n\x04size\x18\x04 \x01(\x01\"`\n\x13PlaceOrdersResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x39\n\x07results\x18\x02 \x03(\x0b\x32(.btx.api.v1.customer.betting.OrderResult\"/\n\x0bOrderResult\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\t\";\n\x13\x43\x61ncelOrdersRequest\x12\x11\n\tmarket_id\x18\x01 \x01(\t\x12\x11\n\torder_ids\x18\x02 \x03(\t\"&\n\x14\x43\x61ncelOrdersResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"D\n\x17UpdateAutoCancelRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x17\n\x0ftimeout_seconds\x18\x02 \x01(\x03\"*\n\x18UpdateAutoCancelResponse\x12\x0e\n\x06status\x18\x01 \x01(\t2\xef\x03\n\nBettingApi\x12y\n\x10StreamMarketData\x12\x34.btx.api.v1.customer.betting.StreamMarketDataRequest\x1a-.btx.api.v1.customer.betting.MarketDataUpdate0\x01\x12p\n\x0bPlaceOrders\x12/.btx.api.v1.customer.betting.PlaceOrdersRequest\x1a\x30.btx.api.v1.customer.betting.PlaceOrdersResponse\x12s\n\x0c\x43\x61ncelOrders\x12\x30.btx.api.v1.customer.betting.CancelOrdersRequest\x1a\x31.btx.api.v1.customer.betting.CancelOrdersResponse\x12\x7f\n\x10UpdateAutoCancel\x12\x34.btx.api.v1.customer.betting.UpdateAutoCancelRequest\x1a\x35.btx.api.v1.customer.betting.UpdateAutoCancelResponseB\x02P\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-btx/api/v1/customer/betting/betting_api.proto\x12\x1b\x62tx.api.v1.customer.betting\"\xf7\x01\n\x17StreamMarketDataRequest\x12\x1e\n\x16market_types_to_stream\x18\x01 \x03(\t\x12\x17\n\x0fstream_ref_data\x18\x02 \x01(\x08\x12\'\n\x1fstream_ref_data_after_timestamp\x18\x03 \x01(\x03\x12\x15\n\rstream_orders\x18\x04 \x01(\x08\x12%\n\x1dstream_orders_after_timestamp\x18\x05 \x01(\x03\x12\x15\n\rstream_prices\x18\x06 \x01(\x08\x12%\n\x1dstream_prices_after_timestamp\x18\x07 \x01(\x03\"\xa4\x02\n\x1aMarketDataStreamingMessage\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\x05\x12\x13\n\x0bupdate_type\x18\x03 \x01(\x05\x12\x46\n\x08ref_data\x18\x04 \x01(\x0b\x32\x34.btx.api.v1.customer.betting.RefDataStreamingMessage\x12\x42\n\x06orders\x18\x05 \x01(\x0b\x32\x32.btx.api.v1.customer.betting.OrderStreamingMessage\x12\x42\n\x06prices\x18\x06 \x01(\x0b\x32\x32.btx.api.v1.customer.betting.PriceStreamingMessage\"\xcc\x02\n\x17RefDataStreamingMessage\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12\x32\n\x06sports\x18\x02 \x03(\x0b\x32\".btx.api.v1.customer.betting.Sport\x12>\n\x0c\x63ompetitions\x18\x03 \x03(\x0b\x32(.btx.api.v1.customer.betting.Competition\x12<\n\x0b\x63ompetitors\x18\x04 \x03(\x0b\x32\'.btx.api.v1.customer.betting.Competitor\x12\x36\n\x08\x66ixtures\x18\x05 \x03(\x0b\x32$.btx.api.v1.customer.betting.Fixture\x12\x34\n\x07markets\x18\x06 \x03(\x0b\x32#.btx.api.v1.customer.betting.Market\"\x8d\x01\n\x05Sport\x12\n\n\x02id\x18\x01 \x01(\t\x12@\n\rdisplay_names\x18\x02 \x03(\x0b\x32).btx.api.v1.customer.betting.LanguageName\x12\x36\n\x08mappings\x18\x03 \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\"\xa5\x01\n\x0b\x43ompetition\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08sport_id\x18\x02 \x01(\t\x12@\n\rdisplay_names\x18\x03 \x03(\x0b\x32).btx.api.v1.customer.betting.LanguageName\x12\x36\n\x08mappings\x18\x04 \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\"\xa4\x01\n\nCompetitor\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08sport_id\x18\x02 \x01(\t\x12@\n\rdisplay_names\x18\x03 \x03(\x0b\x32).btx.api.v1.customer.betting.LanguageName\x12\x36\n\x08mappings\x18\x04 \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\"\xcd\x01\n\x07\x46ixture\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08sport_id\x18\x02 \x01(\t\x12\x16\n\x0e\x63ompetition_id\x18\x05 \x01(\t\x12\x12\n\nstart_time\x18\x06 \x01(\x03\x12@\n\rdisplay_names\x18\x07 \x03(\x0b\x32).btx.api.v1.customer.betting.LanguageName\x12\x36\n\x08mappings\x18\x08 \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\"\x80\x03\n\x06Market\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nfixture_id\x18\x02 \x01(\t\x12\x10\n\x08sport_id\x18\x03 \x01(\t\x12\x16\n\x0e\x63ompetition_id\x18\x04 \x01(\t\x12\x13\n\x0bmarket_type\x18\x05 \x01(\t\x12\x0e\n\x06status\x18\x06 \x01(\x05\x12\x12\n\nstart_time\x18\x07 \x01(\x03\x12=\n\x08settings\x18\n \x01(\x0b\x32+.btx.api.v1.customer.betting.MarketSettings\x12:\n\x07runners\x18\x0b \x03(\x0b\x32).btx.api.v1.customer.betting.MarketRunner\x12@\n\rdisplay_names\x18\x0c \x03(\x0b\x32).btx.api.v1.customer.betting.LanguageName\x12\x36\n\x08mappings\x18\r \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\"\"\n\x0eMarketSettings\x12\x10\n\x08unknown1\x18\x02 \x01(\x05\"v\n\x0cMarketRunner\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x03 \x01(\x05\x12\x36\n\x08mappings\x18\x04 \x03(\x0b\x32$.btx.api.v1.customer.betting.Mapping\x12\x12\n\nsort_order\x18\x05 \x01(\x05\"I\n\x0cLanguageName\x12\x15\n\rlanguage_code\x18\x01 \x01(\t\x12\x14\n\x0cregion_codes\x18\x02 \x03(\t\x12\x0c\n\x04name\x18\x03 \x01(\t\"I\n\x07Mapping\x12\x0e\n\x06source\x18\x01 \x01(\t\x12\x0b\n\x03key\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\t\x12\x12\n\nis_primary\x18\x04 \x01(\x08\"l\n\x15PriceStreamingMessage\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12@\n\rmarket_prices\x18\x02 \x03(\x0b\x32).btx.api.v1.customer.betting.MarketPrices\"c\n\x0cMarketPrices\x12\x11\n\tmarket_id\x18\x01 \x01(\t\x12@\n\rrunner_prices\x18\x02 \x03(\x0b\x32).btx.api.v1.customer.betting.RunnerPrices\"\xe3\x01\n\x0cRunnerPrices\x12\x11\n\trunner_id\x18\x01 \x01(\t\x12<\n\x0b\x62\x61\x63k_prices\x18\x02 \x03(\x0b\x32\'.btx.api.v1.customer.betting.PriceLevel\x12;\n\nlay_prices\x18\x03 \x03(\x0b\x32\'.btx.api.v1.customer.betting.PriceLevel\x12\x45\n\x11last_traded_price\x18\x04 \x01(\x0b\x32*.btx.api.v1.customer.betting.DecimalNumber\"\x81\x01\n\nPriceLevel\x12\x39\n\x05price\x18\x01 \x01(\x0b\x32*.btx.api.v1.customer.betting.DecimalNumber\x12\x38\n\x04size\x18\x02 \x01(\x0b\x32*.btx.api.v1.customer.betting.DecimalNumber\"+\n\rDecimalNumber\x12\r\n\x05value\x18\x01 \x01(\x03\x12\x0b\n\x03\x64ps\x18\x02 \x01(\r\"e\n\x15OrderStreamingMessage\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12\x39\n\ractive_orders\x18\x02 \x03(\x0b\x32\".btx.api.v1.customer.betting.Order\"?\n\x05Order\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x11\n\tmarket_id\x18\x02 \x01(\t\x12\x11\n\trunner_id\x18\x03 \x01(\t\"\'\n\x12PlaceOrdersRequest\x12\x11\n\tmarket_id\x18\x01 \x01(\t\"%\n\x13PlaceOrdersResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"(\n\x13\x43\x61ncelOrdersRequest\x12\x11\n\tmarket_id\x18\x01 \x01(\t\"&\n\x14\x43\x61ncelOrdersResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\"+\n\x17UpdateAutoCancelRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\"*\n\x18UpdateAutoCancelResponse\x12\x0e\n\x06status\x18\x01 \x01(\t2\xfa\x03\n\nBettingApi\x12\x83\x01\n\x10StreamMarketData\x12\x34.btx.api.v1.customer.betting.StreamMarketDataRequest\x1a\x37.btx.api.v1.customer.betting.MarketDataStreamingMessage0\x01\x12p\n\x0bPlaceOrders\x12/.btx.api.v1.customer.betting.PlaceOrdersRequest\x1a\x30.btx.api.v1.customer.betting.PlaceOrdersResponse\x12s\n\x0c\x43\x61ncelOrders\x12\x30.btx.api.v1.customer.betting.CancelOrdersRequest\x1a\x31.btx.api.v1.customer.betting.CancelOrdersResponse\x12\x7f\n\x10UpdateAutoCancel\x12\x34.btx.api.v1.customer.betting.UpdateAutoCancelRequest\x1a\x35.btx.api.v1.customer.betting.UpdateAutoCancelResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'btx.api.v1.customer.betting.betting_api_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'P\001'
-  _globals['_STREAMMARKETDATAREQUEST']._serialized_start=78
-  _globals['_STREAMMARKETDATAREQUEST']._serialized_end=142
-  _globals['_MARKETDATAUPDATE']._serialized_start=145
-  _globals['_MARKETDATAUPDATE']._serialized_end=357
-  _globals['_RUNNERDATA']._serialized_start=360
-  _globals['_RUNNERDATA']._serialized_end=601
-  _globals['_PRICELEVEL']._serialized_start=603
-  _globals['_PRICELEVEL']._serialized_end=644
-  _globals['_PLACEORDERSREQUEST']._serialized_start=646
-  _globals['_PLACEORDERSREQUEST']._serialized_end=754
-  _globals['_PLACEINSTRUCTION']._serialized_start=756
-  _globals['_PLACEINSTRUCTION']._serialized_end=836
-  _globals['_PLACEORDERSRESPONSE']._serialized_start=838
-  _globals['_PLACEORDERSRESPONSE']._serialized_end=934
-  _globals['_ORDERRESULT']._serialized_start=936
-  _globals['_ORDERRESULT']._serialized_end=983
-  _globals['_CANCELORDERSREQUEST']._serialized_start=985
-  _globals['_CANCELORDERSREQUEST']._serialized_end=1044
-  _globals['_CANCELORDERSRESPONSE']._serialized_start=1046
-  _globals['_CANCELORDERSRESPONSE']._serialized_end=1084
-  _globals['_UPDATEAUTOCANCELREQUEST']._serialized_start=1086
-  _globals['_UPDATEAUTOCANCELREQUEST']._serialized_end=1154
-  _globals['_UPDATEAUTOCANCELRESPONSE']._serialized_start=1156
-  _globals['_UPDATEAUTOCANCELRESPONSE']._serialized_end=1198
-  _globals['_BETTINGAPI']._serialized_start=1201
-  _globals['_BETTINGAPI']._serialized_end=1696
+  DESCRIPTOR._loaded_options = None
+  _globals['_STREAMMARKETDATAREQUEST']._serialized_start=79
+  _globals['_STREAMMARKETDATAREQUEST']._serialized_end=326
+  _globals['_MARKETDATASTREAMINGMESSAGE']._serialized_start=329
+  _globals['_MARKETDATASTREAMINGMESSAGE']._serialized_end=621
+  _globals['_REFDATASTREAMINGMESSAGE']._serialized_start=624
+  _globals['_REFDATASTREAMINGMESSAGE']._serialized_end=956
+  _globals['_SPORT']._serialized_start=959
+  _globals['_SPORT']._serialized_end=1100
+  _globals['_COMPETITION']._serialized_start=1103
+  _globals['_COMPETITION']._serialized_end=1268
+  _globals['_COMPETITOR']._serialized_start=1271
+  _globals['_COMPETITOR']._serialized_end=1435
+  _globals['_FIXTURE']._serialized_start=1438
+  _globals['_FIXTURE']._serialized_end=1643
+  _globals['_MARKET']._serialized_start=1646
+  _globals['_MARKET']._serialized_end=2030
+  _globals['_MARKETSETTINGS']._serialized_start=2032
+  _globals['_MARKETSETTINGS']._serialized_end=2066
+  _globals['_MARKETRUNNER']._serialized_start=2068
+  _globals['_MARKETRUNNER']._serialized_end=2186
+  _globals['_LANGUAGENAME']._serialized_start=2188
+  _globals['_LANGUAGENAME']._serialized_end=2261
+  _globals['_MAPPING']._serialized_start=2263
+  _globals['_MAPPING']._serialized_end=2336
+  _globals['_PRICESTREAMINGMESSAGE']._serialized_start=2338
+  _globals['_PRICESTREAMINGMESSAGE']._serialized_end=2446
+  _globals['_MARKETPRICES']._serialized_start=2448
+  _globals['_MARKETPRICES']._serialized_end=2547
+  _globals['_RUNNERPRICES']._serialized_start=2550
+  _globals['_RUNNERPRICES']._serialized_end=2777
+  _globals['_PRICELEVEL']._serialized_start=2780
+  _globals['_PRICELEVEL']._serialized_end=2909
+  _globals['_DECIMALNUMBER']._serialized_start=2911
+  _globals['_DECIMALNUMBER']._serialized_end=2954
+  _globals['_ORDERSTREAMINGMESSAGE']._serialized_start=2956
+  _globals['_ORDERSTREAMINGMESSAGE']._serialized_end=3057
+  _globals['_ORDER']._serialized_start=3059
+  _globals['_ORDER']._serialized_end=3122
+  _globals['_PLACEORDERSREQUEST']._serialized_start=3124
+  _globals['_PLACEORDERSREQUEST']._serialized_end=3163
+  _globals['_PLACEORDERSRESPONSE']._serialized_start=3165
+  _globals['_PLACEORDERSRESPONSE']._serialized_end=3202
+  _globals['_CANCELORDERSREQUEST']._serialized_start=3204
+  _globals['_CANCELORDERSREQUEST']._serialized_end=3244
+  _globals['_CANCELORDERSRESPONSE']._serialized_start=3246
+  _globals['_CANCELORDERSRESPONSE']._serialized_end=3284
+  _globals['_UPDATEAUTOCANCELREQUEST']._serialized_start=3286
+  _globals['_UPDATEAUTOCANCELREQUEST']._serialized_end=3329
+  _globals['_UPDATEAUTOCANCELRESPONSE']._serialized_start=3331
+  _globals['_UPDATEAUTOCANCELRESPONSE']._serialized_end=3373
+  _globals['_BETTINGAPI']._serialized_start=3376
+  _globals['_BETTINGAPI']._serialized_end=3882
 # @@protoc_insertion_point(module_scope)

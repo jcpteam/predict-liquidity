@@ -26,8 +26,7 @@ if _version_not_supported:
 
 
 class BettingApiStub(object):
-    """BettingApi service - ex3.io production gRPC API
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
         """Constructor.
@@ -38,7 +37,7 @@ class BettingApiStub(object):
         self.StreamMarketData = channel.unary_stream(
                 '/btx.api.v1.customer.betting.BettingApi/StreamMarketData',
                 request_serializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.StreamMarketDataRequest.SerializeToString,
-                response_deserializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataUpdate.FromString,
+                response_deserializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataStreamingMessage.FromString,
                 _registered_method=True)
         self.PlaceOrders = channel.unary_unary(
                 '/btx.api.v1.customer.betting.BettingApi/PlaceOrders',
@@ -58,33 +57,28 @@ class BettingApiStub(object):
 
 
 class BettingApiServicer(object):
-    """BettingApi service - ex3.io production gRPC API
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def StreamMarketData(self, request, context):
-        """Stream real-time market data (server streaming)
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def PlaceOrders(self, request, context):
-        """Place orders (up to 100 per call)
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def CancelOrders(self, request, context):
-        """Cancel orders (up to 50 per call)
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def UpdateAutoCancel(self, request, context):
-        """Update auto-cancel properties
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -95,7 +89,7 @@ def add_BettingApiServicer_to_server(servicer, server):
             'StreamMarketData': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamMarketData,
                     request_deserializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.StreamMarketDataRequest.FromString,
-                    response_serializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataUpdate.SerializeToString,
+                    response_serializer=btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataStreamingMessage.SerializeToString,
             ),
             'PlaceOrders': grpc.unary_unary_rpc_method_handler(
                     servicer.PlaceOrders,
@@ -121,8 +115,7 @@ def add_BettingApiServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class BettingApi(object):
-    """BettingApi service - ex3.io production gRPC API
-    """
+    """Missing associated documentation comment in .proto file."""
 
     @staticmethod
     def StreamMarketData(request,
@@ -140,7 +133,7 @@ class BettingApi(object):
             target,
             '/btx.api.v1.customer.betting.BettingApi/StreamMarketData',
             btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.StreamMarketDataRequest.SerializeToString,
-            btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataUpdate.FromString,
+            btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2.MarketDataStreamingMessage.FromString,
             options,
             channel_credentials,
             insecure,

@@ -2,99 +2,157 @@ syntax = "proto3";
 
 package btx.api.v1.customer.betting;
 
-option java_multiple_files = true;
-
-// BettingApi service - ex3.io production gRPC API
 service BettingApi {
-  // Stream real-time market data (server streaming)
-  rpc StreamMarketData (StreamMarketDataRequest) returns (stream MarketDataUpdate);
-
-  // Place orders (up to 100 per call)
+  rpc StreamMarketData (StreamMarketDataRequest) returns (stream MarketDataStreamingMessage);
   rpc PlaceOrders (PlaceOrdersRequest) returns (PlaceOrdersResponse);
-
-  // Cancel orders (up to 50 per call)
   rpc CancelOrders (CancelOrdersRequest) returns (CancelOrdersResponse);
-
-  // Update auto-cancel properties
   rpc UpdateAutoCancel (UpdateAutoCancelRequest) returns (UpdateAutoCancelResponse);
 }
 
-// ── StreamMarketData ──
-
 message StreamMarketDataRequest {
-  repeated string market_ids = 1;
-  // Optional: filter by event IDs
-  repeated string event_ids = 2;
+  repeated string market_types_to_stream = 1;
+  bool stream_ref_data = 2;
+  int64 stream_ref_data_after_timestamp = 3;
+  bool stream_orders = 4;
+  int64 stream_orders_after_timestamp = 5;
+  bool stream_prices = 6;
+  int64 stream_prices_after_timestamp = 7;
 }
 
-message MarketDataUpdate {
+message MarketDataStreamingMessage {
+  string stream_id = 1;
+  int32 status = 2;
+  int32 update_type = 3;
+  RefDataStreamingMessage ref_data = 4;
+  OrderStreamingMessage orders = 5;
+  PriceStreamingMessage prices = 6;
+}
+
+message RefDataStreamingMessage {
+  int64 timestamp = 1;
+  repeated Sport sports = 2;
+  repeated Competition competitions = 3;
+  repeated Competitor competitors = 4;
+  repeated Fixture fixtures = 5;
+  repeated Market markets = 6;
+}
+
+message Sport {
+  string id = 1;
+  repeated LanguageName display_names = 2;
+  repeated Mapping mappings = 3;
+}
+
+message Competition {
+  string id = 1;
+  string sport_id = 2;
+  repeated LanguageName display_names = 3;
+  repeated Mapping mappings = 4;
+}
+
+message Competitor {
+  string id = 1;
+  string sport_id = 2;
+  repeated LanguageName display_names = 3;
+  repeated Mapping mappings = 4;
+}
+
+message Fixture {
+  string id = 1;
+  string sport_id = 2;
+  // field 3-4 unknown/reserved
+  string competition_id = 5;
+  int64 start_time = 6;
+  repeated LanguageName display_names = 7;
+  repeated Mapping mappings = 8;
+}
+
+message Market {
+  string id = 1;
+  string fixture_id = 2;
+  string sport_id = 3;
+  string competition_id = 4;
+  string market_type = 5;
+  int32 status = 6;
+  int64 start_time = 7;
+  // field 8-9 unknown/reserved
+  MarketSettings settings = 10;
+  repeated MarketRunner runners = 11;
+  repeated LanguageName display_names = 12;
+  repeated Mapping mappings = 13;
+}
+
+message MarketSettings {
+  int32 unknown1 = 2;
+}
+
+message MarketRunner {
+  string id = 1;
+  // field 2 unknown
+  int32 status = 3;
+  repeated Mapping mappings = 4;
+  int32 sort_order = 5;
+}
+
+message LanguageName {
+  string language_code = 1;
+  repeated string region_codes = 2;
+  string name = 3;
+}
+
+message Mapping {
+  string source = 1;
+  string key = 2;
+  string value = 3;
+  bool is_primary = 4;
+}
+
+// ── Price streaming ──
+
+message PriceStreamingMessage {
+  int64 timestamp = 1;
+  repeated MarketPrices market_prices = 2;
+}
+
+message MarketPrices {
   string market_id = 1;
-  string event_id = 2;
-  string event_name = 3;
-  string market_type = 4;
-  repeated RunnerData runners = 5;
-  double total_matched = 6;
-  string status = 7;  // OPEN, SUSPENDED, CLOSED
-  int64 timestamp = 8;
+  repeated RunnerPrices runner_prices = 2;
 }
 
-message RunnerData {
+message RunnerPrices {
   string runner_id = 1;
-  string runner_name = 2;
-  repeated PriceLevel back_prices = 3;  // available to back (bids)
-  repeated PriceLevel lay_prices = 4;   // available to lay (asks)
-  double last_traded_price = 5;
-  double total_matched = 6;
-  string status = 7;  // ACTIVE, REMOVED, WINNER, LOSER
+  repeated PriceLevel back_prices = 2;
+  repeated PriceLevel lay_prices = 3;
+  DecimalNumber last_traded_price = 4;
 }
 
 message PriceLevel {
-  double price = 1;
-  double size = 2;
+  DecimalNumber price = 1;
+  DecimalNumber size = 2;
 }
 
-// ── PlaceOrders (stub - not used for orderbook reading) ──
-
-message PlaceOrdersRequest {
-  string market_id = 1;
-  repeated PlaceInstruction instructions = 2;
+message DecimalNumber {
+  int64 value = 1;
+  uint32 dps = 2;
 }
 
-message PlaceInstruction {
-  string runner_id = 1;
-  string side = 2;  // BACK or LAY
-  double price = 3;
-  double size = 4;
+// ── Order streaming ──
+
+message OrderStreamingMessage {
+  int64 timestamp = 1;
+  repeated Order active_orders = 2;
 }
 
-message PlaceOrdersResponse {
-  string status = 1;
-  repeated OrderResult results = 2;
-}
-
-message OrderResult {
+message Order {
   string order_id = 1;
-  string status = 2;
+  string market_id = 2;
+  string runner_id = 3;
 }
 
-// ── CancelOrders (stub) ──
-
-message CancelOrdersRequest {
-  string market_id = 1;
-  repeated string order_ids = 2;
-}
-
-message CancelOrdersResponse {
-  string status = 1;
-}
-
-// ── UpdateAutoCancel (stub) ──
-
-message UpdateAutoCancelRequest {
-  string order_id = 1;
-  int64 timeout_seconds = 2;
-}
-
-message UpdateAutoCancelResponse {
-  string status = 1;
-}
+// ── Stubs ──
+message PlaceOrdersRequest { string market_id = 1; }
+message PlaceOrdersResponse { string status = 1; }
+message CancelOrdersRequest { string market_id = 1; }
+message CancelOrdersResponse { string status = 1; }
+message UpdateAutoCancelRequest { string order_id = 1; }
+message UpdateAutoCancelResponse { string status = 1; }
