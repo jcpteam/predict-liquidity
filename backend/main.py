@@ -583,7 +583,9 @@ async def _betfair_poll_stream(websocket: WebSocket, mapping, betfair_adapter, s
 
 
 async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_event):
-    """BTX gRPC StreamMarketData 实时推送 orderbook 数据"""
+    """BTX gRPC StreamMarketData 实时推送 orderbook 数据
+    BTX 流推送所有足球市场的价格，我们过滤目标 market_id
+    """
     btx_market_id = mapping.mappings.get("btx", "")
     if not btx_market_id:
         return
@@ -601,13 +603,16 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
                 if msg.prices and msg.prices.market_prices:
                     parsed = btx_adapter.parse_price_message(msg.prices)
                     if btx_market_id in parsed:
-                        market_data = [ev.model_dump(mode="json") for ev in parsed[btx_market_id]]
-                        await websocket.send_json({
-                            "type": "btx_update",
-                            "market": "btx",
-                            "events": market_data,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        })
+                        events = parsed[btx_market_id]
+                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
+                        if has_data:
+                            market_data = [ev.model_dump(mode="json") for ev in events]
+                            await websocket.send_json({
+                                "type": "btx_update",
+                                "market": "btx",
+                                "events": market_data,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            })
 
         except WebSocketDisconnect:
             return

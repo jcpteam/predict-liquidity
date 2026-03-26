@@ -160,41 +160,50 @@ class BTXAdapter(BaseMarketAdapter):
     # ── BaseMarketAdapter interface ──
 
     async def fetch_order_book(self, market_id: str, outcome: str = "") -> OrderBook | None:
-        """Fetch orderbook for a specific BTX market (reads first price snapshot)"""
+        """Fetch orderbook for a specific BTX market — reads up to 10 messages"""
         try:
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return None
+            count = 0
             async for msg in stream:
+                count += 1
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
                         for ev in parsed[market_id]:
                             if not outcome or ev.outcome == outcome:
-                                stream.cancel()
-                                return ev.order_book
-                    # First price msg might not have our market, keep reading
-                stream.cancel()
-                break
+                                if ev.order_book.bids or ev.order_book.asks:
+                                    stream.cancel()
+                                    return ev.order_book
+                if count >= 10:
+                    break
+            stream.cancel()
             return None
         except Exception as e:
             print(f"[btx] fetch_order_book error: {e}")
             return None
 
     async def fetch_event(self, market_id: str) -> list[MarketEvent]:
-        """Fetch all outcomes for a BTX market"""
+        """Fetch all outcomes for a BTX market — reads up to 10 messages or 15s"""
         try:
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return []
+            count = 0
             async for msg in stream:
+                count += 1
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
-                        stream.cancel()
-                        return parsed[market_id]
-                stream.cancel()
-                break
+                        events = parsed[market_id]
+                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
+                        if has_data:
+                            stream.cancel()
+                            return events
+                if count >= 10:
+                    break
+            stream.cancel()
             return []
         except Exception as e:
             print(f"[btx] fetch_event error: {e}")
