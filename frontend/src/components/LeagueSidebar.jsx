@@ -3,14 +3,35 @@ import React, { useState } from 'react'
 export default function LeagueSidebar({ leagues, activeLeague, onSelect, totalCount }) {
   const [filter, setFilter] = useState('')
 
+  // Polymarket-style top categories
+  const categories = [
+    { name: 'Sports', icon: '⚽', active: true },
+    { name: 'Politics', icon: '🏛️', active: false },
+    { name: 'Crypto', icon: '₿', active: false },
+    { name: 'Culture', icon: '🎬', active: false },
+    { name: 'Science', icon: '🔬', active: false },
+  ]
+
   const filtered = filter
     ? leagues.filter(([name]) => name.toLowerCase().includes(filter.toLowerCase()))
     : leagues
 
   return (
     <aside className="league-sidebar">
+      <div className="category-tabs">
+        {categories.map(cat => (
+          <div
+            key={cat.name}
+            className={`category-tab ${cat.active ? 'active' : 'disabled'}`}
+            title={cat.active ? cat.name : `${cat.name} (coming soon)`}
+          >
+            <span className="cat-icon">{cat.icon}</span>
+            <span className="cat-name">{cat.name}</span>
+          </div>
+        ))}
+      </div>
       <div className="sidebar-header">
-        <h2>⚽ Leagues ({totalCount})</h2>
+        <h2>Leagues ({totalCount})</h2>
         <input
           placeholder="Filter leagues..."
           value={filter}

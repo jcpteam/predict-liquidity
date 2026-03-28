@@ -4,12 +4,61 @@ import OrderBookChart from './OrderBookChart.jsx'
 
 const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
 
-function sortMarketNames(names) {
-  return [...names].sort((a, b) => {
-    const ia = MARKET_ORDER.indexOf(a)
-    const ib = MARKET_ORDER.indexOf(b)
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+// Normalize outcome names to canonical: Home / Away / Draw
+const DRAW_NAMES = new Set(['draw', 'the draw', 'tie', 'x', 'DRAW'])
+function normalizeOutcome(name) {
+  if (!name) return name
+  if (DRAW_NAMES.has(name.toLowerCase())) return 'Draw'
+  return name
+}
+
+// Group outcomes across markets into columns
+function buildOutcomeColumns(marketsData) {
+  // Collect all outcomes per market
+  const marketOutcomes = {} // {marketName: [{outcome, ...ev}]}
+  for (const mname of MARKET_ORDER) {
+    const events = marketsData[mname]
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      marketOutcomes[mname] = []
+      continue
+    }
+    marketOutcomes[mname] = events.map(ev => ({
+      ...ev,
+      _normalized: normalizeOutcome(ev.outcome),
+    }))
+  }
+
+  // Find all unique normalized outcomes (use first market with data as reference)
+  const outcomeOrder = []
+  const seen = new Set()
+  for (const mname of MARKET_ORDER) {
+    for (const ev of marketOutcomes[mname]) {
+      if (!seen.has(ev._normalized)) {
+        seen.add(ev._normalized)
+        outcomeOrder.push(ev._normalized)
+      }
+    }
+  }
+
+  // Build columns: [{normalizedOutcome, markets: {btx: ev, polymarket: ev, ...}}]
+  return outcomeOrder.map(norm => {
+    const col = { outcome: norm, markets: {} }
+    for (const mname of MARKET_ORDER) {
+      const match = marketOutcomes[mname].find(ev => ev._normalized === norm)
+      col.markets[mname] = match || null
+    }
+    return col
   })
+}
+
+// Get best bid price for an outcome event
+function getBestBid(ev) {
+  if (!ev || !ev.order_book || !ev.order_book.bids || !ev.order_book.bids.length) return null
+  return ev.order_book.bids[0].price
+}
+function getBestAsk(ev) {
+  if (!ev || !ev.order_book || !ev.order_book.asks || !ev.order_book.asks.length) return null
+  return ev.order_book.asks[0].price
 }
 
 export default function EventDetail({ unifiedId, markets, onMappingChange }) {
@@ -27,14 +76,12 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const wsRef = useRef(null)
   const reconnectTimer = useRef(null)
 
-  // Close WS on unmount or unifiedId change
   const closeWs = useCallback(() => {
     if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null }
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
     setWsConnected(false)
   }, [])
 
-  // Connect WebSocket
   const connectWs = useCallback((uid) => {
     closeWs()
     const ws = createOrderBookSocket(uid, {
@@ -46,11 +93,9 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         setOrderBookData(prev => {
           if (!prev) return prev
           const pmEvents = [...(prev.markets.polymarket || [])]
-          // Find matching outcome and update its order_book
           for (let i = 0; i < pmEvents.length; i++) {
-            const ev = pmEvents[i]
-            if (ev.outcome === data.outcome || ev.event_title === data.title) {
-              pmEvents[i] = { ...ev, order_book: { bids: data.bids, asks: data.asks } }
+            if (pmEvents[i].outcome === data.outcome || pmEvents[i].event_title === data.title) {
+              pmEvents[i] = { ...pmEvents[i], order_book: { bids: data.bids, asks: data.asks } }
               break
             }
           }
@@ -72,34 +117,22 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         })
         setLastUpdate(new Date())
       },
-      onTrade: (data) => {
-        setLastUpdate(new Date())
-      },
+      onTrade: () => setLastUpdate(new Date()),
       onKalshiUpdate: (data) => {
-        setOrderBookData(prev => {
-          if (!prev) return prev
-          return { ...prev, markets: { ...prev.markets, kalshi: data.events } }
-        })
+        setOrderBookData(prev => prev ? { ...prev, markets: { ...prev.markets, kalshi: data.events } } : prev)
         setLastUpdate(new Date())
       },
       onBetfairUpdate: (data) => {
-        setOrderBookData(prev => {
-          if (!prev) return prev
-          return { ...prev, markets: { ...prev.markets, betfair: data.events } }
-        })
+        setOrderBookData(prev => prev ? { ...prev, markets: { ...prev.markets, betfair: data.events } } : prev)
         setLastUpdate(new Date())
       },
       onBtxUpdate: (data) => {
-        setOrderBookData(prev => {
-          if (!prev) return prev
-          return { ...prev, markets: { ...prev.markets, btx: data.events } }
-        })
+        setOrderBookData(prev => prev ? { ...prev, markets: { ...prev.markets, btx: data.events } } : prev)
         setLastUpdate(new Date())
       },
       onOpen: () => setWsConnected(true),
       onClose: () => {
         setWsConnected(false)
-        // Auto-reconnect after 3s
         reconnectTimer.current = setTimeout(() => connectWs(uid), 3000)
       },
       onError: (msg) => console.error('[ws]', msg),
@@ -107,7 +140,6 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     wsRef.current = ws
   }, [closeWs])
 
-  // Load mapping
   useEffect(() => {
     setOrderBookData(null)
     matchAttemptedRef.current = false
@@ -116,12 +148,10 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     return () => closeWs()
   }, [unifiedId, closeWs])
 
-  // Auto-match then connect WS
   useEffect(() => {
     if (!mapping) return
     const otherMarkets = markets.filter(m => m !== 'btx')
     const unlinked = otherMarkets.filter(m => !mapping.mappings[m])
-
     const doAutoMatchAndConnect = async () => {
       if (unlinked.length > 0 && !matchAttemptedRef.current) {
         matchAttemptedRef.current = true
@@ -134,14 +164,12 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         } catch (e) { console.error('Auto-match failed:', e) }
         finally { setAutoMatching(false) }
       }
-      // Connect WebSocket for real-time data
       connectWs(unifiedId)
     }
     doAutoMatchAndConnect()
   }, [mapping?.unified_id])
 
   const otherMarkets = markets.filter(m => m !== 'btx')
-
   useEffect(() => {
     if (otherMarkets.length > 0 && !selectedMarket) setSelectedMarket(otherMarkets[0])
   }, [markets])
@@ -150,17 +178,14 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
     if (!selectedMarket) return
     setSearchResults(await searchMarketEvents(selectedMarket, searchQuery))
   }
-
   const handleAddMapping = async (marketEventId) => {
     await addMarketMapping(unifiedId, selectedMarket, marketEventId)
     setSearchResults([]); setManualId(''); setAddingMarket(false)
     const updated = await fetchEventMapping(unifiedId)
     setMapping(updated)
     onMappingChange()
-    // Reconnect WS to pick up new market
     connectWs(unifiedId)
   }
-
   const handleRemove = async (marketName) => {
     await removeMarketMapping(unifiedId, marketName)
     const updated = await fetchEventMapping(unifiedId)
@@ -170,7 +195,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 
   if (!mapping) return <div className="detail-page"><p>Loading...</p></div>
 
-  const marketNames = orderBookData ? MARKET_ORDER : []
+  const columns = orderBookData ? buildOutcomeColumns(orderBookData.markets || {}) : []
 
   return (
     <div className="detail-page">
@@ -178,11 +203,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         <h2>{mapping.display_name}</h2>
         <div className="detail-title-meta">
           {mapping.event_time && <span className="detail-time">🕐 {new Date(mapping.event_time).toLocaleString()}</span>}
-          {wsConnected ? (
-            <span className="live-dot">● LIVE</span>
-          ) : (
-            <span className="auto-match-status">○ Connecting...</span>
-          )}
+          {wsConnected ? <span className="live-dot">● LIVE</span> : <span className="auto-match-status">○ Connecting...</span>}
           {lastUpdate && <span className="timestamp">Updated: {lastUpdate.toLocaleTimeString()}</span>}
           {autoMatching && <span className="auto-match-status">🔄 Auto-matching...</span>}
         </div>
@@ -196,9 +217,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
             <div key={name} className="linked-item">
               <span className="market-badge">{name}</span>
               <code>{id}</code>
-              {name !== 'btx' && (
-                <button className="btn-danger btn-sm" onClick={() => handleRemove(name)}>✕</button>
-              )}
+              {name !== 'btx' && <button className="btn-danger btn-sm" onClick={() => handleRemove(name)}>✕</button>}
             </div>
           ))}
         </div>
@@ -222,8 +241,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
               <div className="search-results">
                 {searchResults.map((r, i) => (
                   <div key={i} className="search-item" onClick={() => handleAddMapping(r.market_id)}>
-                    <span>{r.title}</span>
-                    <code>{r.market_id}</code>
+                    <span>{r.title}</span><code>{r.market_id}</code>
                   </div>
                 ))}
               </div>
@@ -232,82 +250,98 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         )}
       </div>
 
-      {/* Order Books */}
       {!orderBookData && !autoMatching && (
         <p className="empty">{wsConnected ? 'Waiting for data...' : 'Connecting...'}</p>
       )}
 
-      {marketNames.map(mname => {
-        const events = orderBookData.markets[mname]
-        const hasData = events && events.length > 0
-        const hasError = hasData && events.length === 1 && events[0].error
-        return (
-          <div key={mname} className="market-row">
-            <div className="market-row-header">
-              <h3>{mname.toUpperCase()}</h3>
-              {hasData && <span className="market-row-meta">{events.length} outcome{events.length > 1 ? 's' : ''}</span>}
-            </div>
-            {!hasData ? (
-              <div className="market-row-nodata">No Data</div>
-            ) : hasError ? (
-              <p className="error">{events[0].error}</p>
-            ) : (
-              <div className="market-row-cards">
-                {events.map((ev, i) => (
-                  <div key={i} className="ob-card">
-                    {ev.event_title && <div className="ob-card-title">{ev.event_title}</div>}
-                    <div className="ob-card-meta">
-                      <span className="outcome-label">{ev.outcome}</span>
-                      {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}
-                      {ev.volume_24h != null && <span className="volume">Vol: ${Number(ev.volume_24h).toLocaleString()}</span>}
-                    </div>
-                    {ev.order_book && <OrderBookChart orderBook={ev.order_book} />}
-                    {ev.error && <p className="error">{ev.error}</p>}
+      {/* Outcome columns — each column = one outcome (Home/Away/Draw), rows = markets */}
+      {columns.length > 0 && (
+        <div className="outcome-columns">
+          {columns.map(col => (
+            <div key={col.outcome} className="outcome-col">
+              <div className="outcome-col-header">{col.outcome}</div>
+              {MARKET_ORDER.map(mname => {
+                const ev = col.markets[mname]
+                return (
+                  <div key={mname} className="outcome-market-cell">
+                    <div className="cell-market-label">{mname.toUpperCase()}</div>
+                    {!ev || !ev.order_book ? (
+                      <div className="cell-nodata">No Data</div>
+                    ) : (
+                      <div className="cell-ob">
+                        <div className="cell-meta">
+                          {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}
+                          {getBestBid(ev) != null && <span className="cell-bid">Bid: {(getBestBid(ev) * 100).toFixed(1)}¢</span>}
+                          {getBestAsk(ev) != null && <span className="cell-ask">Ask: {(getBestAsk(ev) * 100).toFixed(1)}¢</span>}
+                        </div>
+                        <OrderBookChart orderBook={ev.order_book} />
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
 
-      {marketNames.length >= 2 && orderBookData && <LiquiditySummary data={orderBookData} />}
+      {/* Spread Summary — per outcome, spread = best_bid + best_ask + best_draw across markets */}
+      {columns.length > 0 && <SpreadSummary columns={columns} />}
     </div>
   )
 }
 
-function LiquiditySummary({ data }) {
-  const summary = Object.entries(data.markets).map(([name, events]) => {
-    let totalBidDepth = 0, totalAskDepth = 0, bestBid = 0, bestAsk = 1
-    for (const ev of events) {
-      if (ev.order_book) {
-        for (const b of ev.order_book.bids) totalBidDepth += b.size * b.price
-        for (const a of ev.order_book.asks) totalAskDepth += a.size * a.price
-        if (ev.order_book.bids.length) bestBid = Math.max(bestBid, ev.order_book.bids[0].price)
-        if (ev.order_book.asks.length) bestAsk = Math.min(bestAsk, ev.order_book.asks[0].price)
-      }
+function SpreadSummary({ columns }) {
+  // Per market, per outcome: best bid price
+  // Spread for a market = sum of best bids across all outcomes
+  const marketSpreads = {}
+  for (const mname of MARKET_ORDER) {
+    const outcomeBids = {}
+    for (const col of columns) {
+      const ev = col.markets[mname]
+      const bid = getBestBid(ev)
+      outcomeBids[col.outcome] = bid
     }
-    return { name, totalBidDepth, totalAskDepth, spread: bestAsk - bestBid }
-  })
+    // Total spread = sum of all outcome best bids
+    const values = Object.values(outcomeBids).filter(v => v != null)
+    const totalSpread = values.length > 0 ? values.reduce((s, v) => s + v, 0) : null
+    marketSpreads[mname] = { outcomeBids, totalSpread }
+  }
 
   return (
-    <div className="liquidity-summary">
-      <h3>Liquidity Summary</h3>
-      <table>
-        <thead>
-          <tr><th>Market</th><th>Bid Depth ($)</th><th>Ask Depth ($)</th><th>Spread</th></tr>
-        </thead>
-        <tbody>
-          {summary.map(s => (
-            <tr key={s.name}>
-              <td>{s.name}</td>
-              <td>${s.totalBidDepth.toFixed(2)}</td>
-              <td>${s.totalAskDepth.toFixed(2)}</td>
-              <td>{(s.spread * 100).toFixed(2)}¢</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="spread-summary">
+      <h3>Spread Summary</h3>
+      <p className="spread-formula">Spread = Best Bid (Home) + Best Bid (Away) + Best Bid (Draw)</p>
+      <div className="outcome-columns spread-columns">
+        {/* Per-outcome spread comparison */}
+        {columns.map(col => (
+          <div key={col.outcome} className="outcome-col spread-col">
+            <div className="outcome-col-header">{col.outcome} — Best Bid</div>
+            {MARKET_ORDER.map(mname => {
+              const bid = marketSpreads[mname]?.outcomeBids[col.outcome]
+              return (
+                <div key={mname} className="spread-cell">
+                  <span className="cell-market-label">{mname.toUpperCase()}</span>
+                  <span className="spread-value">{bid != null ? `${(bid * 100).toFixed(2)}¢` : '—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        {/* Total spread column */}
+        <div className="outcome-col spread-col spread-total-col">
+          <div className="outcome-col-header">Total Spread</div>
+          {MARKET_ORDER.map(mname => {
+            const total = marketSpreads[mname]?.totalSpread
+            return (
+              <div key={mname} className="spread-cell">
+                <span className="cell-market-label">{mname.toUpperCase()}</span>
+                <span className="spread-value spread-total">{total != null ? `${(total * 100).toFixed(2)}¢` : '—'}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

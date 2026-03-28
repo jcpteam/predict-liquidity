@@ -592,14 +592,18 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
 
     while not stop_event.is_set():
         try:
+            print(f"[ws-btx] Opening stream for market {btx_market_id}")
             stream = await btx_adapter.stream_market_data(stream_prices=True)
             if stream is None:
+                print("[ws-btx] Failed to open stream, retrying in 10s")
                 await asyncio.sleep(10)
                 continue
 
+            msg_count = 0
             async for msg in stream:
                 if stop_event.is_set():
                     break
+                msg_count += 1
                 if msg.prices and msg.prices.market_prices:
                     parsed = btx_adapter.parse_price_message(msg.prices)
                     if btx_market_id in parsed:
@@ -614,6 +618,8 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
                                 "timestamp": datetime.now(timezone.utc).isoformat(),
                             })
 
+            print(f"[ws-btx] Stream ended after {msg_count} messages")
+
         except WebSocketDisconnect:
             return
         except asyncio.CancelledError:
@@ -621,7 +627,7 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
         except Exception as e:
             print(f"[ws-btx] Stream error: {e}")
             if not stop_event.is_set():
-                await asyncio.sleep(10)
+                await asyncio.sleep(5)
 
 
 # ── 静态文件 ──

@@ -286,3 +286,109 @@ button:hover { background: #2ea043; }
   border-radius: 8px;
   background: #0d1117;
 }
+
+/* ── Category tabs (Polymarket-style) ── */
+.category-tabs {
+  display: flex;
+  border-bottom: 1px solid #30363d;
+  background: #0d1117;
+}
+.category-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 2px solid transparent;
+}
+.category-tab.active {
+  background: #161b22;
+  border-bottom-color: #58a6ff;
+}
+.category-tab.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.category-tab:not(.disabled):hover { background: #1c2128; }
+.cat-icon { font-size: 18px; margin-bottom: 2px; }
+.cat-name { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+.category-tab.active .cat-name { color: #58a6ff; }
+
+/* ── Outcome columns layout (issue 2) ── */
+.outcome-columns {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.outcome-col {
+  flex: 1;
+  min-width: 280px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.outcome-col-header {
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #e1e4e8;
+  background: #1c2128;
+  border-bottom: 1px solid #30363d;
+  text-align: center;
+}
+.outcome-market-cell {
+  padding: 10px 12px;
+  border-bottom: 1px solid #21262d;
+}
+.outcome-market-cell:last-child { border-bottom: none; }
+.cell-market-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #58a6ff;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.cell-nodata {
+  color: #484f58;
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 0;
+}
+.cell-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.cell-bid { color: #3fb950; font-size: 12px; }
+.cell-ask { color: #f85149; font-size: 12px; }
+
+/* ── Spread summary (issue 3+4) ── */
+.spread-summary {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.spread-summary h3 { font-size: 14px; color: #8b949e; margin-bottom: 4px; }
+.spread-formula { font-size: 11px; color: #484f58; margin-bottom: 12px; }
+.spread-columns { margin-bottom: 0; }
+.spread-col { min-width: 200px; }
+.spread-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid #21262d;
+}
+.spread-cell:last-child { border-bottom: none; }
+.spread-value { font-size: 14px; font-weight: 600; color: #c9d1d9; }
+.spread-total { color: #d29922; font-size: 15px; }
+.spread-total-col { background: #1c2128; }
+.spread-total-col .outcome-col-header { color: #d29922; }
