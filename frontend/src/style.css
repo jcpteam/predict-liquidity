@@ -287,34 +287,84 @@ button:hover { background: #2ea043; }
   background: #0d1117;
 }
 
-/* ── Category tabs (Polymarket-style) ── */
-.category-tabs {
-  display: flex;
-  border-bottom: 1px solid #30363d;
-  background: #0d1117;
-}
-.category-tab {
+/* ── Home page ── */
+.home-page {
   flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 10px 4px 8px;
-  cursor: pointer;
-  transition: background 0.12s;
-  border-bottom: 2px solid transparent;
 }
-.category-tab.active {
+.home-tabs {
+  display: flex;
   background: #161b22;
-  border-bottom-color: #58a6ff;
+  border-bottom: 1px solid #30363d;
+  padding: 0 24px;
+  overflow-x: auto;
+  flex-shrink: 0;
 }
-.category-tab.disabled {
+.home-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.home-tab.active {
+  border-bottom-color: #58a6ff;
+  color: #58a6ff;
+}
+.home-tab.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.home-tab:not(.disabled):hover { background: #1c2128; }
+.home-tab-icon { font-size: 18px; }
+.home-tab-name { font-size: 13px; font-weight: 600; color: #c9d1d9; }
+.home-tab.active .home-tab-name { color: #58a6ff; }
+
+.home-content {
+  padding: 28px 32px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+.home-section-title { font-size: 22px; color: #e1e4e8; margin-bottom: 4px; }
+.home-section-desc { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
+
+.sports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.sport-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.sport-card:hover { border-color: #58a6ff; transform: translateY(-1px); }
+.sport-card-disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
-.category-tab:not(.disabled):hover { background: #1c2128; }
-.cat-icon { font-size: 18px; margin-bottom: 2px; }
-.cat-name { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
-.category-tab.active .cat-name { color: #58a6ff; }
+.sport-card-disabled:hover { border-color: #30363d; transform: none; }
+.sport-card-icon { font-size: 32px; flex-shrink: 0; }
+.sport-card-body { flex: 1; min-width: 0; }
+.sport-card-name { font-size: 15px; font-weight: 700; color: #e1e4e8; margin-bottom: 2px; }
+.sport-card-desc { font-size: 12px; color: #8b949e; }
+.sport-card-arrow { font-size: 18px; color: #58a6ff; font-weight: 700; }
+.sport-card-soon {
+  font-size: 10px; color: #8b949e; background: #21262d;
+  padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
+}
 
 /* ── Outcome columns layout (issue 2) ── */
 .outcome-columns {
