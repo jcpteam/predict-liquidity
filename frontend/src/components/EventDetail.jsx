@@ -4,49 +4,104 @@ import OrderBookChart from './OrderBookChart.jsx'
 
 const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
 
-// Normalize outcome names to canonical: Home / Away / Draw
-const DRAW_NAMES = new Set(['draw', 'the draw', 'tie', 'x', 'DRAW'])
-function normalizeOutcome(name) {
-  if (!name) return name
-  if (DRAW_NAMES.has(name.toLowerCase())) return 'Draw'
-  return name
+// Get the display label for an outcome event
+// Polymarket: outcome is always "Yes", real info is in event_title
+// Others: outcome is the team name or "Draw"
+function getOutcomeLabel(ev, marketName) {
+  if (marketName === 'polymarket') {
+    // event_title is like "Liverpool FC" or "Draw (Liverpool FC vs. Fulham FC)"
+    return ev.event_title || ev.outcome || ''
+  }
+  return ev.outcome || ev.event_title || ''
+}
+
+// Check if a label represents a draw
+function isDraw(label) {
+  if (!label) return false
+  const l = label.toLowerCase().trim()
+  return l === 'draw' || l === 'the draw' || l === 'tie' || l === 'x' || l.startsWith('draw (') || l.startsWith('draw(')
+}
+
+// Normalize a label for matching: lowercase, strip common suffixes
+function normLabel(label) {
+  if (!label) return ''
+  let s = label.toLowerCase().trim()
+  // Strip "FC", "AFC", "SC" etc
+  s = s.replace(/\b(fc|afc|sc|ac|cf|cd|fk|nk|sk)\b/gi, '').trim()
+  // Strip trailing/leading whitespace and dots
+  s = s.replace(/[.\-]+$/, '').replace(/^[.\-]+/, '').trim()
+  s = s.replace(/\s+/g, ' ')
+  return s
+}
+
+// Simple word overlap similarity
+function labelSimilarity(a, b) {
+  if (!a || !b) return 0
+  const na = normLabel(a)
+  const nb = normLabel(b)
+  if (na === nb) return 1
+  if (na.includes(nb) || nb.includes(na)) return 0.85
+  const wa = new Set(na.split(' '))
+  const wb = new Set(nb.split(' '))
+  const inter = [...wa].filter(w => wb.has(w)).length
+  const union = new Set([...wa, ...wb]).size
+  return union > 0 ? inter / union : 0
 }
 
 // Group outcomes across markets into columns
 function buildOutcomeColumns(marketsData) {
-  // Collect all outcomes per market
-  const marketOutcomes = {} // {marketName: [{outcome, ...ev}]}
+  // Step 1: Build canonical outcome list from BTX (primary) or first market with data
+  const canonicalOutcomes = [] // [{label, isDrawFlag}]
   for (const mname of MARKET_ORDER) {
     const events = marketsData[mname]
-    if (!events || !Array.isArray(events) || events.length === 0) {
-      marketOutcomes[mname] = []
-      continue
+    if (!events || !Array.isArray(events) || events.length === 0) continue
+    for (const ev of events) {
+      const label = getOutcomeLabel(ev, mname)
+      canonicalOutcomes.push({ label, isDraw: isDraw(label) })
     }
-    marketOutcomes[mname] = events.map(ev => ({
-      ...ev,
-      _normalized: normalizeOutcome(ev.outcome),
-    }))
+    break // Use first market with data as canonical
   }
 
-  // Find all unique normalized outcomes (use first market with data as reference)
-  const outcomeOrder = []
-  const seen = new Set()
-  for (const mname of MARKET_ORDER) {
-    for (const ev of marketOutcomes[mname]) {
-      if (!seen.has(ev._normalized)) {
-        seen.add(ev._normalized)
-        outcomeOrder.push(ev._normalized)
-      }
-    }
-  }
+  if (canonicalOutcomes.length === 0) return []
 
-  // Build columns: [{normalizedOutcome, markets: {btx: ev, polymarket: ev, ...}}]
-  return outcomeOrder.map(norm => {
-    const col = { outcome: norm, markets: {} }
+  // Step 2: For each canonical outcome, find best match in each market
+  return canonicalOutcomes.map(canon => {
+    const col = { outcome: canon.isDraw ? 'Draw' : canon.label, markets: {} }
+
     for (const mname of MARKET_ORDER) {
-      const match = marketOutcomes[mname].find(ev => ev._normalized === norm)
-      col.markets[mname] = match || null
+      const events = marketsData[mname]
+      if (!events || !Array.isArray(events) || events.length === 0) {
+        col.markets[mname] = null
+        continue
+      }
+
+      // Find best matching event
+      let bestEv = null
+      let bestScore = -1
+
+      for (const ev of events) {
+        const evLabel = getOutcomeLabel(ev, mname)
+        const evIsDraw = isDraw(evLabel)
+
+        // Draw matches draw
+        if (canon.isDraw && evIsDraw) {
+          bestEv = ev
+          bestScore = 1
+          break
+        }
+        // Non-draw: compare by name similarity
+        if (!canon.isDraw && !evIsDraw) {
+          const sim = labelSimilarity(canon.label, evLabel)
+          if (sim > bestScore) {
+            bestScore = sim
+            bestEv = ev
+          }
+        }
+      }
+
+      col.markets[mname] = bestScore >= 0.3 ? bestEv : null
     }
+
     return col
   })
 }
