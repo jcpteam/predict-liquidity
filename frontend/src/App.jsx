@@ -3,10 +3,11 @@ import { fetchLeagues, fetchLeagueEvents, syncEvents, fetchMarkets, autoMatchAll
 import HomePage from './components/HomePage.jsx'
 import LeagueSidebar from './components/LeagueSidebar.jsx'
 import EventDashboard from './components/EventDashboard.jsx'
+import MarketOverview from './components/MarketOverview.jsx'
 import EventDetail from './components/EventDetail.jsx'
 import './style.css'
 
-// Views: 'home' | 'leagues' | 'detail'
+// Views: home → leagues → markets → detail
 export default function App() {
   const [view, setView] = useState('home')
   const [leagues, setLeagues] = useState([])
@@ -19,6 +20,8 @@ export default function App() {
   const [matchResult, setMatchResult] = useState(null)
   const [selectedLeague, setSelectedLeague] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState(null)
+  const [selectedEventName, setSelectedEventName] = useState('')
+  const [selectedMarketLabel, setSelectedMarketLabel] = useState(null)
 
   const loadLeagues = async () => {
     setLoading(true)
@@ -32,9 +35,8 @@ export default function App() {
 
   const loadEventsForLeague = async (league) => {
     setLoadingEvents(true)
-    try {
-      setEvents(await fetchLeagueEvents(league))
-    } finally { setLoadingEvents(false) }
+    try { setEvents(await fetchLeagueEvents(league)) }
+    finally { setLoadingEvents(false) }
   }
 
   const handleSelectSport = (sportId) => {
@@ -54,18 +56,24 @@ export default function App() {
     loadEventsForLeague(league)
   }
 
-  const handleSelectEvent = (eventId) => {
+  // Events page → Markets page
+  const handleSelectEvent = (eventId, eventName) => {
     setSelectedEventId(eventId)
+    setSelectedEventName(eventName || '')
+    setSelectedMarketLabel(null)
+    setView('markets')
+  }
+
+  // Markets page → Detail page (specific market/outcome)
+  const handleSelectMarket = (marketLabel) => {
+    setSelectedMarketLabel(marketLabel)
     setView('detail')
   }
 
   const handleBack = () => {
-    if (view === 'detail') {
-      setSelectedEventId(null)
-      setView('leagues')
-    } else {
-      setView('home')
-    }
+    if (view === 'detail') { setView('markets') }
+    else if (view === 'markets') { setView('leagues') }
+    else if (view === 'leagues') { setView('home') }
   }
 
   const handleSync = async () => {
@@ -75,16 +83,12 @@ export default function App() {
       setMatchResult(res.auto_match ? { results: res.auto_match } : null)
       const lgs = await loadLeagues()
       if (selectedLeague) loadEventsForLeague(selectedLeague)
-      else if (lgs.length > 0) {
-        setSelectedLeague(lgs[0].name)
-        loadEventsForLeague(lgs[0].name)
-      }
+      else if (lgs.length > 0) { setSelectedLeague(lgs[0].name); loadEventsForLeague(lgs[0].name) }
     } finally { setSyncing(false) }
   }
 
   const handleAutoMatch = async () => {
-    setMatching(true)
-    setMatchResult(null)
+    setMatching(true); setMatchResult(null)
     try {
       const res = await autoMatchAll()
       setMatchResult(res)
@@ -95,25 +99,23 @@ export default function App() {
   const leagueEntries = leagues.map(l => [l.name, { length: l.count }])
   const totalCount = leagues.reduce((s, l) => s + l.count, 0)
 
-  // ── Home page ──
+  // ── Home ──
   if (view === 'home') {
     return (
       <div className="app">
-        <header>
-          <h1>⚡ Prediction Market Liquidity</h1>
-        </header>
+        <header><h1>⚡ Prediction Market Liquidity</h1></header>
         <HomePage onSelectSport={handleSelectSport} />
       </div>
     )
   }
 
-  // ── Detail page ──
+  // ── Orderbook Detail ──
   if (view === 'detail' && selectedEventId) {
     return (
       <div className="app">
         <header>
           <h1>⚡ Prediction Market Liquidity</h1>
-          <button className="sync-btn back-btn" onClick={handleBack}>← Back to Events</button>
+          <button className="sync-btn back-btn" onClick={handleBack}>← Back to Markets</button>
         </header>
         <div className="detail-fullpage">
           <EventDetail
@@ -126,7 +128,27 @@ export default function App() {
     )
   }
 
-  // ── Leagues + Events page ──
+  // ── Markets Overview ──
+  if (view === 'markets' && selectedEventId) {
+    return (
+      <div className="app">
+        <header>
+          <h1>⚡ Prediction Market Liquidity</h1>
+          <button className="sync-btn back-btn" onClick={handleBack}>← Back to Events</button>
+        </header>
+        <div className="detail-fullpage">
+          <MarketOverview
+            unifiedId={selectedEventId}
+            displayName={selectedEventName}
+            onSelectMarket={handleSelectMarket}
+            onBack={handleBack}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Leagues + Events ──
   return (
     <div className="app">
       <header>
@@ -139,7 +161,6 @@ export default function App() {
           {matching ? '⏳ Matching...' : '🤖 Auto-Match'}
         </button>
       </header>
-
       {matchResult && (
         <div className="match-result-banner">
           {matchResult.results?.map((r, i) => (
@@ -148,19 +169,16 @@ export default function App() {
           <button className="btn-sm" onClick={() => setMatchResult(null)}>✕</button>
         </div>
       )}
-
       <div className="main-layout">
-        <LeagueSidebar
-          leagues={leagueEntries}
-          activeLeague={selectedLeague}
-          onSelect={handleSelectLeague}
-          totalCount={totalCount}
-        />
+        <LeagueSidebar leagues={leagueEntries} activeLeague={selectedLeague} onSelect={handleSelectLeague} totalCount={totalCount} />
         <EventDashboard
           league={selectedLeague}
           events={events}
           loading={loading || loadingEvents}
-          onSelectEvent={handleSelectEvent}
+          onSelectEvent={(id) => {
+            const ev = events.find(e => e.unified_id === id)
+            handleSelectEvent(id, ev?.display_name || '')
+          }}
         />
       </div>
     </div>

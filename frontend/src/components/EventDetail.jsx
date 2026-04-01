@@ -309,7 +309,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         <p className="empty">{wsConnected ? 'Waiting for data...' : 'Connecting...'}</p>
       )}
 
-      {/* Outcome columns — each column = one outcome (Home/Away/Draw), rows = markets */}
+      {/* Outcome columns — each column = one outcome, rows = markets */}
       {columns.length > 0 && (
         <div className="outcome-columns">
           {columns.map(col => (
@@ -339,64 +339,6 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
           ))}
         </div>
       )}
-
-      {/* Spread Summary — per outcome, spread = best_bid + best_ask + best_draw across markets */}
-      {columns.length > 0 && <SpreadSummary columns={columns} />}
-    </div>
-  )
-}
-
-function SpreadSummary({ columns }) {
-  // Per market, per outcome: best bid price
-  // Spread for a market = sum of best bids across all outcomes
-  const marketSpreads = {}
-  for (const mname of MARKET_ORDER) {
-    const outcomeBids = {}
-    for (const col of columns) {
-      const ev = col.markets[mname]
-      const bid = getBestBid(ev)
-      outcomeBids[col.outcome] = bid
-    }
-    // Total spread = sum of all outcome best bids
-    const values = Object.values(outcomeBids).filter(v => v != null)
-    const totalSpread = values.length > 0 ? values.reduce((s, v) => s + v, 0) : null
-    marketSpreads[mname] = { outcomeBids, totalSpread }
-  }
-
-  return (
-    <div className="spread-summary">
-      <h3>Spread Summary</h3>
-      <p className="spread-formula">Spread = Best Bid (Home) + Best Bid (Away) + Best Bid (Draw)</p>
-      <div className="outcome-columns spread-columns">
-        {/* Per-outcome spread comparison */}
-        {columns.map(col => (
-          <div key={col.outcome} className="outcome-col spread-col">
-            <div className="outcome-col-header">{col.outcome} — Best Bid</div>
-            {MARKET_ORDER.map(mname => {
-              const bid = marketSpreads[mname]?.outcomeBids[col.outcome]
-              return (
-                <div key={mname} className="spread-cell">
-                  <span className="cell-market-label">{mname.toUpperCase()}</span>
-                  <span className="spread-value">{bid != null ? `${(bid * 100).toFixed(2)}¢` : '—'}</span>
-                </div>
-              )
-            })}
-          </div>
-        ))}
-        {/* Total spread column */}
-        <div className="outcome-col spread-col spread-total-col">
-          <div className="outcome-col-header">Total Spread</div>
-          {MARKET_ORDER.map(mname => {
-            const total = marketSpreads[mname]?.totalSpread
-            return (
-              <div key={mname} className="spread-cell">
-                <span className="cell-market-label">{mname.toUpperCase()}</span>
-                <span className="spread-value spread-total">{total != null ? `${(total * 100).toFixed(2)}¢` : '—'}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }
