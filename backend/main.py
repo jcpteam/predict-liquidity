@@ -258,6 +258,11 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
     if "btx" in mapping.mappings:
         btx_adapter = registry.get("btx")
         if btx_adapter:
+            # Pre-load runner names for display
+            try:
+                await btx_adapter._load_runner_names()
+            except Exception:
+                pass
             tasks.append(asyncio.create_task(
                 _btx_grpc_stream(websocket, mapping, btx_adapter, stop_event)
             ))

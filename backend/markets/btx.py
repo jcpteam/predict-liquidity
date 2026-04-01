@@ -3,6 +3,7 @@
 认证: OAuth2 client_credentials → Bearer token + x-account-id header
 价格: DecimalNumber {value, dps} → actual = value / 10^dps (decimal odds)
 Orderbook: back_prices = bids, lay_prices = asks
+Runner names: 从 ref_data.competitors 获取，缓存在 _runner_names
 """
 from __future__ import annotations
 
@@ -28,10 +29,22 @@ def _load_grpc():
 
 
 def _decimal_to_float(dn) -> float:
-    """Convert BTX DecimalNumber {value, dps} to float"""
     if not dn or not dn.value:
         return 0.0
     return dn.value / (10 ** dn.dps) if dn.dps else float(dn.value)
+
+
+def _get_en_name(display_names) -> str:
+    """Extract English name from repeated LanguageName"""
+    for dn in display_names:
+        if dn.language_code == "en" and "*" in dn.region_codes:
+            return dn.name
+    for dn in display_names:
+        if dn.language_code == "en":
+            return dn.name
+    if display_names:
+        return display_names[0].name
+    return ""
 
 
 class BTXAdapter(BaseMarketAdapter):
@@ -52,6 +65,9 @@ class BTXAdapter(BaseMarketAdapter):
         self._grpc = None
         self._pb2 = None
         self._pb2_grpc = None
+        # Runner ID → display name cache (loaded from ref_data)
+        self._runner_names: dict[str, str] = {}
+        self._runner_names_loaded = False
 
     def _ensure_grpc_loaded(self):
         if self._grpc is None:
@@ -99,11 +115,47 @@ class BTXAdapter(BaseMarketAdapter):
         self._channel = self._grpc.aio.secure_channel(self.GRPC_HOST, creds)
         self._stub = self._pb2_grpc.BettingApiStub(self._channel)
 
+    async def _load_runner_names(self):
+        """Load competitor/runner names from ref_data stream (once)"""
+        if self._runner_names_loaded:
+            return
+        try:
+            await self._ensure_token()
+            await self._ensure_channel()
+            if not self._stub:
+                return
+            req = self._pb2.StreamMarketDataRequest(
+                market_types_to_stream=["FOOTBALL_FULL_TIME_MATCH_ODDS"],
+                stream_ref_data=True,
+                stream_ref_data_after_timestamp=0,
+                stream_prices=False,
+            )
+            stream = self._stub.StreamMarketData(req, metadata=self._grpc_metadata())
+            async for msg in stream:
+                if msg.ref_data and msg.ref_data.timestamp > 0:
+                    # Competitors → runner names
+                    for comp in msg.ref_data.competitors:
+                        name = _get_en_name(comp.display_names)
+                        if name:
+                            self._runner_names[comp.id] = name
+                    # Also extract from market runners (some have display_names)
+                    for mkt in msg.ref_data.markets:
+                        for runner in mkt.runners:
+                            if runner.id == "DRAW":
+                                self._runner_names["DRAW"] = "Draw"
+                    print(f"[btx] Loaded {len(self._runner_names)} runner names")
+                    self._runner_names_loaded = True
+                    stream.cancel()
+                    return
+            stream.cancel()
+        except Exception as e:
+            print(f"[btx] Failed to load runner names: {e}")
+
     async def stream_market_data(self, market_types=None, stream_prices=True, stream_ref_data=False):
         """Open StreamMarketData gRPC stream"""
         await self._ensure_token()
         await self._ensure_channel()
-        if not self._access_token or not self._stub:
+        if not self._stub:
             return None
         if market_types is None:
             market_types = ["FOOTBALL_FULL_TIME_MATCH_ODDS"]
@@ -119,8 +171,7 @@ class BTXAdapter(BaseMarketAdapter):
     def parse_price_message(self, prices_msg, runner_names=None) -> dict[str, list[MarketEvent]]:
         """Parse PriceStreamingMessage → {market_id: [MarketEvent]}"""
         result = {}
-        if runner_names is None:
-            runner_names = {}
+        names = runner_names or self._runner_names
         for mp in prices_msg.market_prices:
             mid = mp.market_id
             events = []
@@ -144,11 +195,12 @@ class BTXAdapter(BaseMarketAdapter):
                 asks.sort(key=lambda x: x.price)
                 ltp = _decimal_to_float(rp.last_traded_price) if rp.HasField('last_traded_price') else None
                 ob = OrderBook(bids=bids, asks=asks, timestamp=datetime.now(timezone.utc))
+                display_name = names.get(rid, rid)
                 events.append(MarketEvent(
                     market_id=f"{mid}:{rid}",
                     market_name=self.name,
                     event_title="",
-                    outcome=runner_names.get(rid, rid),
+                    outcome=display_name,
                     order_book=ob,
                     last_price=round(1.0 / ltp, 4) if ltp and ltp > 1 else ltp,
                     volume_24h=None,
@@ -160,8 +212,8 @@ class BTXAdapter(BaseMarketAdapter):
     # ── BaseMarketAdapter interface ──
 
     async def fetch_order_book(self, market_id: str, outcome: str = "") -> OrderBook | None:
-        """Fetch orderbook for a specific BTX market — reads up to 10 messages"""
         try:
+            await self._load_runner_names()
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return None
@@ -185,8 +237,8 @@ class BTXAdapter(BaseMarketAdapter):
             return None
 
     async def fetch_event(self, market_id: str) -> list[MarketEvent]:
-        """Fetch all outcomes for a BTX market — reads up to 10 messages or 15s"""
         try:
+            await self._load_runner_names()
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return []
