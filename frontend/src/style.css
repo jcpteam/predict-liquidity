@@ -393,8 +393,13 @@ button:hover { background: #2ea043; }
 .outcome-market-cell {
   padding: 10px 12px;
   border-bottom: 1px solid #21262d;
+  height: 320px;
+  overflow-y: auto;
 }
 .outcome-market-cell:last-child { border-bottom: none; }
+.outcome-market-cell::-webkit-scrollbar { width: 4px; }
+.outcome-market-cell::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+.outcome-market-cell::-webkit-scrollbar-track { background: transparent; }
 .cell-market-label {
   font-size: 11px;
   font-weight: 600;

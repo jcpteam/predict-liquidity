@@ -339,6 +339,59 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
           ))}
         </div>
       )}
+
+      {columns.length > 0 && <SpreadSummary columns={columns} />}
+    </div>
+  )
+}
+
+function SpreadSummary({ columns }) {
+  const marketSpreads = {}
+  for (const mname of MARKET_ORDER) {
+    const outcomeBids = {}
+    for (const col of columns) {
+      const bid = getBestBid(col.markets[mname])
+      outcomeBids[col.outcome] = bid
+    }
+    const values = Object.values(outcomeBids).filter(v => v != null)
+    marketSpreads[mname] = {
+      outcomeBids,
+      totalSpread: values.length > 0 ? values.reduce((s, v) => s + v, 0) : null,
+    }
+  }
+
+  return (
+    <div className="spread-summary">
+      <h3>Spread Summary</h3>
+      <p className="spread-formula">Spread = Sum of Best Bids across all outcomes</p>
+      <div className="outcome-columns spread-columns">
+        {columns.map(col => (
+          <div key={col.outcome} className="outcome-col spread-col">
+            <div className="outcome-col-header">{col.outcome}</div>
+            {MARKET_ORDER.map(mname => {
+              const bid = marketSpreads[mname]?.outcomeBids[col.outcome]
+              return (
+                <div key={mname} className="spread-cell">
+                  <span className="cell-market-label">{mname.toUpperCase()}</span>
+                  <span className="spread-value">{bid != null ? `${(bid * 100).toFixed(2)}¢` : '—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        <div className="outcome-col spread-col spread-total-col">
+          <div className="outcome-col-header">Total</div>
+          {MARKET_ORDER.map(mname => {
+            const total = marketSpreads[mname]?.totalSpread
+            return (
+              <div key={mname} className="spread-cell">
+                <span className="cell-market-label">{mname.toUpperCase()}</span>
+                <span className="spread-value spread-total">{total != null ? `${(total * 100).toFixed(2)}¢` : '—'}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
