@@ -502,3 +502,24 @@ button:hover { background: #2ea043; }
 }
 .mkt-type-name { font-size: 15px; font-weight: 700; color: #e1e4e8; }
 .mkt-type-id { font-size: 11px; color: #484f58; font-family: monospace; }
+
+/* ── Currency toggle ── */
+.currency-toggle {
+  background: #30363d;
+  color: #c9d1d9;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #484f58;
+  transition: all 0.15s;
+}
+.currency-toggle:hover { background: #484f58; }
+.currency-toggle.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.mkt-th-currency {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: #8b949e;
+  margin-top: 2px;
+}
