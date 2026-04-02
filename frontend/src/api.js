@@ -46,6 +46,11 @@ export async function fetchOrderBooks(unifiedId) {
   return res.json()
 }
 
+export async function fetchAllMarkets(unifiedId) {
+  const res = await fetch(`${BASE}/events/${unifiedId}/all-markets`)
+  return res.json()
+}
+
 export async function autoMatchMarket(marketName) {
   const res = await fetch(`${BASE}/automatch/${marketName}`, { method: 'POST' })
   return res.json()

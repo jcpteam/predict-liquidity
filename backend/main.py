@@ -188,6 +188,117 @@ async def get_event_orderbooks(unified_id: str):
     }
 
 
+@app.get("/api/events/{unified_id}/all-markets")
+async def get_all_btx_markets(unified_id: str):
+    """获取某个 fixture 的所有 BTX market types + 其他平台对应数据
+    BTX 一场比赛有多个 market: Match Odds, Asian Handicap, Over/Under, Correct Score 等
+    """
+    mapping = await mapping_store.get_mapping(unified_id)
+    if not mapping:
+        raise HTTPException(404, "Event not found")
+
+    btx_adapter = registry.get("btx")
+    if not btx_adapter or "btx" not in mapping.mappings:
+        # Fallback to single market
+        return await get_event_orderbooks(unified_id)
+
+    # Load BTX ref_data to find all markets for this fixture
+    btx_fixture_market_id = mapping.mappings["btx"]
+    try:
+        await btx_adapter._load_runner_names()
+        # Get ref_data to find fixture_id from market_id, then all markets for that fixture
+        stream = await btx_adapter.stream_market_data(
+            market_types=["FOOTBALL_FULL_TIME_MATCH_ODDS",
+                          "FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+                          "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+                          "FOOTBALL_FULL_TIME_CORRECT_SCORE"],
+            stream_ref_data=True, stream_prices=True,
+        )
+        if not stream:
+            return await get_event_orderbooks(unified_id)
+
+        fixture_id = None
+        all_btx_market_ids = []
+        market_type_map = {}  # market_id -> market_type
+        btx_prices = {}  # market_id -> [MarketEvent]
+
+        msg_count = 0
+        async for msg in stream:
+            msg_count += 1
+            # Extract ref_data
+            if msg.ref_data and msg.ref_data.timestamp > 0:
+                for mkt in msg.ref_data.markets:
+                    if mkt.id == btx_fixture_market_id:
+                        fixture_id = mkt.fixture_id
+                if fixture_id:
+                    for mkt in msg.ref_data.markets:
+                        if mkt.fixture_id == fixture_id:
+                            all_btx_market_ids.append(mkt.id)
+                            market_type_map[mkt.id] = mkt.market_type
+
+            # Extract prices
+            if msg.prices and msg.prices.market_prices:
+                parsed = btx_adapter.parse_price_message(msg.prices)
+                for mid, events in parsed.items():
+                    if mid in market_type_map or mid == btx_fixture_market_id:
+                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
+                        if has_data:
+                            btx_prices[mid] = events
+
+            if msg_count >= 5 or (fixture_id and btx_prices):
+                break
+
+        stream.cancel()
+
+        # Build response: group by market_type
+        btx_market_groups = []
+        for mid in all_btx_market_ids:
+            mtype = market_type_map.get(mid, "UNKNOWN")
+            events = btx_prices.get(mid, [])
+            liq = sum(
+                sum(b.size for b in e.order_book.bids) + sum(a.size for a in e.order_book.asks)
+                for e in events if e.order_book
+            )
+            btx_market_groups.append({
+                "market_id": mid,
+                "market_type": mtype,
+                "market_type_display": mtype.replace("FOOTBALL_FULL_TIME_", "").replace("_", " ").title(),
+                "outcomes": [ev.model_dump(mode="json") for ev in events],
+                "liquidity": round(liq, 2),
+            })
+
+        # Also fetch other platforms' data (single market each)
+        other_markets = {}
+        tasks = []
+        other_names = []
+        for mname, meid in mapping.mappings.items():
+            if mname == "btx":
+                continue
+            adapter = registry.get(mname)
+            if adapter:
+                tasks.append(adapter.fetch_event(meid))
+                other_names.append(mname)
+
+        fetched = await asyncio.gather(*tasks, return_exceptions=True)
+        for mname, data in zip(other_names, fetched):
+            if isinstance(data, Exception):
+                other_markets[mname] = [{"error": str(data)}]
+            else:
+                other_markets[mname] = [ev.model_dump(mode="json") for ev in data]
+
+        return {
+            "unified_id": mapping.unified_id,
+            "display_name": mapping.display_name,
+            "event_time": mapping.event_time,
+            "btx_markets": btx_market_groups,
+            "other_markets": other_markets,
+        }
+
+    except Exception as e:
+        print(f"[all-markets] Error: {e}")
+        return await get_event_orderbooks(unified_id)
+
+
 # ── 清理已结束事件 ──
 
 @app.post("/api/events/cleanup")

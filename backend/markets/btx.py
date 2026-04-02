@@ -112,7 +112,8 @@ class BTXAdapter(BaseMarketAdapter):
             return
         self._ensure_grpc_loaded()
         creds = self._grpc.ssl_channel_credentials()
-        self._channel = self._grpc.aio.secure_channel(self.GRPC_HOST, creds)
+        opts = [('grpc.max_receive_message_length', 50 * 1024 * 1024)]  # 50MB
+        self._channel = self._grpc.aio.secure_channel(self.GRPC_HOST, creds, options=opts)
         self._stub = self._pb2_grpc.BettingApiStub(self._channel)
 
     async def _load_runner_names(self):
@@ -125,7 +126,13 @@ class BTXAdapter(BaseMarketAdapter):
             if not self._stub:
                 return
             req = self._pb2.StreamMarketDataRequest(
-                market_types_to_stream=["FOOTBALL_FULL_TIME_MATCH_ODDS"],
+                market_types_to_stream=[
+                    "FOOTBALL_FULL_TIME_MATCH_ODDS",
+                    "FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+                    "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+                    "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
+                    "FOOTBALL_FULL_TIME_CORRECT_SCORE",
+                ],
                 stream_ref_data=True,
                 stream_ref_data_after_timestamp=0,
                 stream_prices=False,

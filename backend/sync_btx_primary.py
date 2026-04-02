@@ -97,12 +97,19 @@ def fetch_btx_ref_data():
     token = resp.json()["access_token"]
     print("[btx] Token OK")
 
-    channel = grpc.secure_channel("api.prod.ex3.io:443", grpc.ssl_channel_credentials())
+    channel = grpc.secure_channel("api.prod.ex3.io:443", grpc.ssl_channel_credentials(),
+        options=[("grpc.max_receive_message_length", 50 * 1024 * 1024)])
     stub = betting_api_pb2_grpc.BettingApiStub(channel)
     metadata = [("authorization", f"Bearer {token}"), ("x-account-id", account_id)]
 
     req = betting_api_pb2.StreamMarketDataRequest(
-        market_types_to_stream=["FOOTBALL_FULL_TIME_MATCH_ODDS"],
+        market_types_to_stream=[
+            "FOOTBALL_FULL_TIME_MATCH_ODDS",
+            "FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+            "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+            "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
+            "FOOTBALL_FULL_TIME_CORRECT_SCORE",
+        ],
         stream_ref_data=True,
         stream_ref_data_after_timestamp=0,
     )
