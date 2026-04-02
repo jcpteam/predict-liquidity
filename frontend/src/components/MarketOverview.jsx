@@ -63,6 +63,7 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
 
   const btxMarkets = data.btx_markets || []
   const otherMarkets = data.other_markets || {}
+  const betfairPerBtx = data.betfair_per_btx || {}
 
   // Group BTX markets by market_type
   const grouped = {}
@@ -84,13 +85,11 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
         </div>
       </div>
 
-      {/* Liquidity info popup */}
       {showLiqInfo && (
         <div className="liq-info-popup" onClick={() => setShowLiqInfo(false)}>
           <div className="liq-info-content" onClick={e => e.stopPropagation()}>
             <h4>Liquidity Calculation</h4>
             <p>Liquidity = Sum of all order sizes (bids + asks) across all outcomes in this market.</p>
-            <p>For each outcome, we sum the size of every bid and ask level in the orderbook.</p>
             <p>Currency: BTX & Kalshi in USD, Polymarket in USDC (≈USD), Betfair in GBP (×{GBP_TO_USD} for USD).</p>
             <button onClick={() => setShowLiqInfo(false)}>Got it</button>
           </div>
@@ -103,6 +102,7 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
           typeDisplay={group.display}
           btxMarkets={group.markets}
           otherMarkets={otherMarkets}
+          betfairPerBtx={betfairPerBtx}
           onSelectMarket={onSelectMarket}
           showUSD={showUSD}
           onShowLiqInfo={() => setShowLiqInfo(true)}
@@ -112,7 +112,7 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
   )
 }
 
-function MarketTypeGroup({ typeDisplay, btxMarkets, otherMarkets, onSelectMarket, showUSD, onShowLiqInfo }) {
+function MarketTypeGroup({ typeDisplay, btxMarkets, otherMarkets, betfairPerBtx, onSelectMarket, showUSD, onShowLiqInfo }) {
   return (
     <div className="mkt-section">
       <div className="mkt-section-header">
@@ -135,6 +135,7 @@ function MarketTypeGroup({ typeDisplay, btxMarkets, otherMarkets, onSelectMarket
           <tbody>
             {btxMarkets.map(btxMkt => (
               <MarketRow key={btxMkt.market_id} btxMkt={btxMkt} otherMarkets={otherMarkets}
+                betfairEvents={betfairPerBtx[btxMkt.market_id] || null}
                 onSelectMarket={onSelectMarket} showUSD={showUSD} onShowLiqInfo={onShowLiqInfo} />
             ))}
           </tbody>
@@ -144,7 +145,7 @@ function MarketTypeGroup({ typeDisplay, btxMarkets, otherMarkets, onSelectMarket
   )
 }
 
-function MarketRow({ btxMkt, otherMarkets, onSelectMarket, showUSD, onShowLiqInfo }) {
+function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUSD, onShowLiqInfo }) {
   const outcomes = btxMkt.outcomes || []
   const marketLabel = btxMkt.display_name || btxMkt.market_type_display
 
@@ -181,7 +182,8 @@ function MarketRow({ btxMkt, otherMarkets, onSelectMarket, showUSD, onShowLiqInf
               return <Cell key={p} ev={btxEv} platform={p} showUSD={showUSD}
                        onClick={() => onSelectMarket(btxMkt.market_type)} />
             }
-            const matched = findMatch(btxLabel, btxIsDraw, otherMarkets[p], p)
+            const evts = (p === 'betfair' && betfairEvents) ? betfairEvents : otherMarkets[p]
+            const matched = findMatch(btxLabel, btxIsDraw, evts, p)
             if (!matched) return <td key={p} className="mkt-td-cell mkt-td-empty">—</td>
             return <Cell key={p} ev={matched} platform={p} showUSD={showUSD}
                      onClick={() => onSelectMarket(btxMkt.market_type)} />

@@ -244,12 +244,16 @@ class BTXAdapter(BaseMarketAdapter):
             return None
 
     async def fetch_event(self, market_id: str) -> list[MarketEvent]:
+        """Fetch all outcomes for a BTX market.
+        Returns results from initial snapshot even if orderbooks are empty.
+        """
         try:
             await self._load_runner_names()
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return []
             count = 0
+            best_events = []
             async for msg in stream:
                 count += 1
                 if msg.prices and msg.prices.market_prices:
@@ -260,10 +264,12 @@ class BTXAdapter(BaseMarketAdapter):
                         if has_data:
                             stream.cancel()
                             return events
+                        elif not best_events:
+                            best_events = events  # Keep first match even if empty
                 if count >= 10:
                     break
             stream.cancel()
-            return []
+            return best_events
         except Exception as e:
             print(f"[btx] fetch_event error: {e}")
             return []

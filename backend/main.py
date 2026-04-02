@@ -220,7 +220,8 @@ async def get_all_btx_markets(unified_id: str):
         fixture_id = None
         all_btx_market_ids = []
         market_type_map = {}  # market_id -> market_type
-        market_display_map = {}  # market_id -> display_name (e.g. "Over/Under 2.5 Goals")
+        market_display_map = {}  # market_id -> display_name
+        btx_to_betfair = {}  # btx_market_id -> betfair_market_id (from BTX mappings)
         btx_prices = {}  # market_id -> [MarketEvent]
 
         msg_count = 0
@@ -236,22 +237,28 @@ async def get_all_btx_markets(unified_id: str):
                         if mkt.fixture_id == fixture_id:
                             all_btx_market_ids.append(mkt.id)
                             market_type_map[mkt.id] = mkt.market_type
-                            # Get English display name
                             for dn in mkt.display_names:
                                 if dn.language_code == "en":
                                     market_display_map[mkt.id] = dn.name
                                     break
+                            # Extract Betfair MarketId from BTX market mappings
+                            for mp in mkt.mappings:
+                                if mp.source == "Betfair" and mp.key == "MarketId":
+                                    btx_to_betfair[mkt.id] = mp.value
 
-            # Extract prices
+            # Extract prices — keep ALL markets for this fixture (even empty ones)
             if msg.prices and msg.prices.market_prices:
                 parsed = btx_adapter.parse_price_message(msg.prices)
                 for mid, events in parsed.items():
                     if mid in market_type_map or mid == btx_fixture_market_id:
+                        # Always store, overwrite with better data if available
+                        existing = btx_prices.get(mid)
                         has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
-                        if has_data:
+                        if has_data or not existing:
                             btx_prices[mid] = events
 
-            if msg_count >= 5 or (fixture_id and btx_prices):
+            # Wait for ref_data + at least one price message
+            if msg_count >= 8 or (fixture_id and msg_count >= 3):
                 break
 
         stream.cancel()
@@ -274,12 +281,33 @@ async def get_all_btx_markets(unified_id: str):
                 "liquidity": round(liq, 2),
             })
 
-        # Also fetch other platforms' data (single market each)
+        # Also fetch other platforms' data
+        # Betfair: use per-market Betfair IDs from BTX ref_data
+        # Polymarket/Kalshi: single market (Match Odds equivalent)
         other_markets = {}
+        betfair_adapter = registry.get("betfair")
+        betfair_per_btx = {}  # btx_market_id -> betfair events
+
         tasks = []
         other_names = []
         for mname, meid in mapping.mappings.items():
             if mname == "btx":
+                continue
+            if mname == "betfair":
+                # Fetch Betfair for each BTX market that has a Betfair mapping
+                if betfair_adapter:
+                    bf_tasks = []
+                    bf_btx_ids = []
+                    for btx_mid, bf_mid in btx_to_betfair.items():
+                        bf_tasks.append(betfair_adapter.fetch_event(bf_mid))
+                        bf_btx_ids.append(btx_mid)
+                    if bf_tasks:
+                        bf_results = await asyncio.gather(*bf_tasks, return_exceptions=True)
+                        for btx_mid, bf_data in zip(bf_btx_ids, bf_results):
+                            if isinstance(bf_data, Exception):
+                                betfair_per_btx[btx_mid] = []
+                            else:
+                                betfair_per_btx[btx_mid] = [ev.model_dump(mode="json") for ev in bf_data]
                 continue
             adapter = registry.get(mname)
             if adapter:
@@ -299,6 +327,7 @@ async def get_all_btx_markets(unified_id: str):
             "event_time": mapping.event_time,
             "btx_markets": btx_market_groups,
             "other_markets": other_markets,
+            "betfair_per_btx": betfair_per_btx,
         }
 
     except Exception as e:
