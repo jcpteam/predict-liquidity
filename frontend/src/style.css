@@ -523,3 +523,61 @@ button:hover { background: #2ea043; }
   color: #8b949e;
   margin-top: 2px;
 }
+
+/* ── Market row header (sub-market name) ── */
+.mkt-row-market-header td {
+  background: #1c2128;
+  padding: 8px 14px;
+  border-bottom: 1px solid #30363d;
+}
+.mkt-td-market-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mkt-market-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #58a6ff;
+  cursor: pointer;
+}
+.mkt-market-label:hover { text-decoration: underline; }
+.mkt-market-liq {
+  font-size: 12px;
+  color: #8b949e;
+  cursor: pointer;
+}
+.liq-help {
+  color: #58a6ff;
+  font-size: 13px;
+  margin-left: 4px;
+}
+.mkt-type-count {
+  font-size: 12px;
+  color: #8b949e;
+  background: #21262d;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* ── Liquidity info popup ── */
+.liq-info-popup {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.liq-info-content {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+}
+.liq-info-content h4 { font-size: 16px; color: #e1e4e8; margin-bottom: 12px; }
+.liq-info-content p { font-size: 13px; color: #8b949e; margin-bottom: 8px; }
+.liq-info-content button { margin-top: 8px; }

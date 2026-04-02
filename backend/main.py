@@ -220,6 +220,7 @@ async def get_all_btx_markets(unified_id: str):
         fixture_id = None
         all_btx_market_ids = []
         market_type_map = {}  # market_id -> market_type
+        market_display_map = {}  # market_id -> display_name (e.g. "Over/Under 2.5 Goals")
         btx_prices = {}  # market_id -> [MarketEvent]
 
         msg_count = 0
@@ -235,6 +236,11 @@ async def get_all_btx_markets(unified_id: str):
                         if mkt.fixture_id == fixture_id:
                             all_btx_market_ids.append(mkt.id)
                             market_type_map[mkt.id] = mkt.market_type
+                            # Get English display name
+                            for dn in mkt.display_names:
+                                if dn.language_code == "en":
+                                    market_display_map[mkt.id] = dn.name
+                                    break
 
             # Extract prices
             if msg.prices and msg.prices.market_prices:
@@ -263,6 +269,7 @@ async def get_all_btx_markets(unified_id: str):
                 "market_id": mid,
                 "market_type": mtype,
                 "market_type_display": mtype.replace("FOOTBALL_FULL_TIME_", "").replace("_", " ").title(),
+                "display_name": market_display_map.get(mid, ""),
                 "outcomes": [ev.model_dump(mode="json") for ev in events],
                 "liquidity": round(liq, 2),
             })

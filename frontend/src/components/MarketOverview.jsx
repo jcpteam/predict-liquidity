@@ -2,63 +2,56 @@ import React, { useState, useEffect } from 'react'
 import { fetchAllMarkets } from '../api'
 
 const PLATFORMS = ['btx', 'polymarket', 'kalshi', 'betfair']
-
-// Native currency per platform
 const PLATFORM_CURRENCY = {
   btx: { symbol: '$', code: 'USD' },
   polymarket: { symbol: '', code: 'USDC' },
   kalshi: { symbol: '$', code: 'USD' },
   betfair: { symbol: '£', code: 'GBP' },
 }
-
-// GBP → USD rate (approximate, could be fetched from API)
 const GBP_TO_USD = 1.27
 
 function toUSD(amount, platform) {
-  if (platform === 'betfair') return amount * GBP_TO_USD
-  return amount // USD and USDC ≈ 1:1
+  return platform === 'betfair' ? amount * GBP_TO_USD : amount
 }
-
-function formatAmount(amount, platform, showUSD) {
-  if (showUSD) {
-    const usd = toUSD(amount, platform)
-    return `$${usd.toFixed(0)}`
-  }
-  const cur = PLATFORM_CURRENCY[platform] || { symbol: '$', code: '' }
-  return `${cur.symbol}${amount.toFixed(0)} ${cur.code}`
+function formatAmt(amount, platform, showUSD) {
+  if (showUSD) return `$${toUSD(amount, platform).toFixed(0)}`
+  const c = PLATFORM_CURRENCY[platform]
+  return `${c.symbol}${amount.toFixed(0)} ${c.code}`
 }
-
-function getTotalDepth(events) {
-  if (!events || !Array.isArray(events)) return 0
-  let d = 0
-  for (const ev of events) {
-    if (ev.order_book) {
-      for (const b of (ev.order_book.bids || [])) d += b.size
-      for (const a of (ev.order_book.asks || [])) d += a.size
-    }
-  }
-  return d
-}
-
 function isDraw(label) {
   if (!label) return false
   const l = label.toLowerCase().trim()
   return l === 'draw' || l === 'the draw' || l === 'tie' || l.startsWith('draw (')
 }
-
 function getLabel(ev, platform) {
-  if (platform === 'polymarket') return ev.event_title || ev.outcome || ''
-  return ev.outcome || ev.event_title || ''
+  return platform === 'polymarket' ? (ev.event_title || ev.outcome || '') : (ev.outcome || ev.event_title || '')
 }
-
 function normLabel(s) {
   return (s || '').toLowerCase().replace(/\b(fc|afc|sc|ac|cf)\b/gi, '').trim().replace(/\s+/g, ' ')
+}
+function findMatch(btxLabel, btxIsDraw, events, platform) {
+  if (!events || !Array.isArray(events)) return null
+  for (const ev of events) {
+    const l = getLabel(ev, platform)
+    if (btxIsDraw && isDraw(l)) return ev
+    if (!btxIsDraw && !isDraw(l)) {
+      const a = normLabel(btxLabel), b = normLabel(l)
+      if (a === b || a.includes(b) || b.includes(a)) return ev
+    }
+  }
+  return null
+}
+function getDepth(ev) {
+  if (!ev?.order_book) return 0
+  return (ev.order_book.bids || []).reduce((s, b) => s + b.size, 0) +
+         (ev.order_book.asks || []).reduce((s, a) => s + a.size, 0)
 }
 
 export default function MarketOverview({ unifiedId, displayName, onSelectMarket }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showUSD, setShowUSD] = useState(false)
+  const [showLiqInfo, setShowLiqInfo] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -71,6 +64,14 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
   const btxMarkets = data.btx_markets || []
   const otherMarkets = data.other_markets || {}
 
+  // Group BTX markets by market_type
+  const grouped = {}
+  for (const m of btxMarkets) {
+    const key = m.market_type || 'UNKNOWN'
+    if (!grouped[key]) grouped[key] = { display: m.market_type_display, markets: [] }
+    grouped[key].markets.push(m)
+  }
+
   return (
     <div className="detail-page">
       <div className="detail-title-bar">
@@ -78,49 +79,51 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
         <div className="detail-title-meta">
           {data.event_time && <span className="detail-time">🕐 {new Date(data.event_time).toLocaleString()}</span>}
           <button className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>
-            {showUSD ? '$ USD' : '🔄 Convert to USD'}
+            {showUSD ? '$ All USD' : '🔄 Convert to USD'}
           </button>
         </div>
       </div>
 
-      {btxMarkets.length > 0 ? (
-        btxMarkets.map(btxMkt => (
-          <MarketTypeSection
-            key={btxMkt.market_id}
-            btxMkt={btxMkt}
-            otherMarkets={otherMarkets}
-            onSelectMarket={onSelectMarket}
-            showUSD={showUSD}
-          />
-        ))
-      ) : (
-        <p className="empty">No BTX markets found</p>
+      {/* Liquidity info popup */}
+      {showLiqInfo && (
+        <div className="liq-info-popup" onClick={() => setShowLiqInfo(false)}>
+          <div className="liq-info-content" onClick={e => e.stopPropagation()}>
+            <h4>Liquidity Calculation</h4>
+            <p>Liquidity = Sum of all order sizes (bids + asks) across all outcomes in this market.</p>
+            <p>For each outcome, we sum the size of every bid and ask level in the orderbook.</p>
+            <p>Currency: BTX & Kalshi in USD, Polymarket in USDC (≈USD), Betfair in GBP (×{GBP_TO_USD} for USD).</p>
+            <button onClick={() => setShowLiqInfo(false)}>Got it</button>
+          </div>
+        </div>
       )}
+
+      {Object.entries(grouped).map(([typeKey, group]) => (
+        <MarketTypeGroup
+          key={typeKey}
+          typeDisplay={group.display}
+          btxMarkets={group.markets}
+          otherMarkets={otherMarkets}
+          onSelectMarket={onSelectMarket}
+          showUSD={showUSD}
+          onShowLiqInfo={() => setShowLiqInfo(true)}
+        />
+      ))}
     </div>
   )
 }
 
-function MarketTypeSection({ btxMkt, otherMarkets, onSelectMarket, showUSD }) {
-  const btxOutcomes = btxMkt.outcomes || []
-  const btxLiq = btxMkt.liquidity || 0
-
-  const otherLiqs = {}
-  for (const p of PLATFORMS) {
-    if (p === 'btx') continue
-    otherLiqs[p] = getTotalDepth(otherMarkets[p])
-  }
-
+function MarketTypeGroup({ typeDisplay, btxMarkets, otherMarkets, onSelectMarket, showUSD, onShowLiqInfo }) {
   return (
     <div className="mkt-section">
       <div className="mkt-section-header">
-        <span className="mkt-type-name">{btxMkt.market_type_display}</span>
-        <span className="mkt-type-id">{btxMkt.market_id}</span>
+        <span className="mkt-type-name">{typeDisplay}</span>
+        <span className="mkt-type-count">{btxMarkets.length} market{btxMarkets.length > 1 ? 's' : ''}</span>
       </div>
       <div className="mkt-table-wrap">
         <table className="mkt-table">
           <thead>
             <tr>
-              <th className="mkt-th-outcome">Outcome</th>
+              <th className="mkt-th-outcome">Market</th>
               {PLATFORMS.map(p => (
                 <th key={p} className="mkt-th-platform">
                   {p.toUpperCase()}
@@ -130,42 +133,10 @@ function MarketTypeSection({ btxMkt, otherMarkets, onSelectMarket, showUSD }) {
             </tr>
           </thead>
           <tbody>
-            {btxOutcomes.map((btxEv, idx) => {
-              const btxLabel = btxEv.outcome || ''
-              const btxIsDraw = isDraw(btxLabel)
-              const displayLabel = btxIsDraw ? 'Draw' : btxLabel
-              return (
-                <tr key={idx} className="mkt-row">
-                  <td className="mkt-td-outcome">{displayLabel}</td>
-                  {PLATFORMS.map(p => {
-                    if (p === 'btx') {
-                      return <MarketCell key={p} ev={btxEv} platform={p} showUSD={showUSD}
-                               onClick={() => onSelectMarket(btxMkt.market_type)} />
-                    }
-                    const events = otherMarkets[p]
-                    if (!events || !Array.isArray(events)) return <td key={p} className="mkt-td-cell mkt-td-empty">—</td>
-                    const matched = findMatchingOutcome(btxLabel, btxIsDraw, events, p)
-                    if (!matched) return <td key={p} className="mkt-td-cell mkt-td-empty">—</td>
-                    return <MarketCell key={p} ev={matched} platform={p} showUSD={showUSD}
-                             onClick={() => onSelectMarket(btxMkt.market_type)} />
-                  })}
-                </tr>
-              )
-            })}
-            <tr className="mkt-row mkt-row-summary">
-              <td className="mkt-td-outcome mkt-td-summary-label"
-                  title="Liquidity = Sum of all bid sizes + ask sizes across all outcomes">
-                Liquidity 💡
-              </td>
-              {PLATFORMS.map(p => {
-                const liq = p === 'btx' ? btxLiq : (otherLiqs[p] || 0)
-                return (
-                  <td key={p} className="mkt-td-cell mkt-td-summary">
-                    <span className="mkt-cell-liq">{formatAmount(liq, p, showUSD)}</span>
-                  </td>
-                )
-              })}
-            </tr>
+            {btxMarkets.map(btxMkt => (
+              <MarketRow key={btxMkt.market_id} btxMkt={btxMkt} otherMarkets={otherMarkets}
+                onSelectMarket={onSelectMarket} showUSD={showUSD} onShowLiqInfo={onShowLiqInfo} />
+            ))}
           </tbody>
         </table>
       </div>
@@ -173,31 +144,63 @@ function MarketTypeSection({ btxMkt, otherMarkets, onSelectMarket, showUSD }) {
   )
 }
 
-function findMatchingOutcome(btxLabel, btxIsDraw, events, platform) {
-  for (const ev of events) {
-    const evLabel = getLabel(ev, platform)
-    const evIsDraw = isDraw(evLabel)
-    if (btxIsDraw && evIsDraw) return ev
-    if (!btxIsDraw && !evIsDraw) {
-      const a = normLabel(btxLabel)
-      const b = normLabel(evLabel)
-      if (a === b || a.includes(b) || b.includes(a)) return ev
-    }
-  }
-  return null
+function MarketRow({ btxMkt, otherMarkets, onSelectMarket, showUSD, onShowLiqInfo }) {
+  const outcomes = btxMkt.outcomes || []
+  const marketLabel = btxMkt.display_name || btxMkt.market_type_display
+
+  // Each outcome is a sub-row
+  const rows = outcomes.map((btxEv, idx) => {
+    const btxLabel = btxEv.outcome || ''
+    const btxIsDraw = isDraw(btxLabel)
+    const displayLabel = btxIsDraw ? 'Draw' : btxLabel
+    return { btxEv, btxLabel, btxIsDraw, displayLabel, idx }
+  })
+
+  // Compute BTX liquidity for this market
+  const btxLiq = outcomes.reduce((s, ev) => s + getDepth(ev), 0)
+
+  return (
+    <>
+      {/* Market name header row */}
+      <tr className="mkt-row mkt-row-market-header">
+        <td colSpan={PLATFORMS.length + 1} className="mkt-td-market-name">
+          <span className="mkt-market-label" onClick={() => onSelectMarket(btxMkt.market_type)}>
+            {marketLabel}
+          </span>
+          <span className="mkt-market-liq" onClick={onShowLiqInfo}>
+            Liq: {formatAmt(btxLiq, 'btx', showUSD)} <span className="liq-help">ⓘ</span>
+          </span>
+        </td>
+      </tr>
+      {/* Outcome rows */}
+      {rows.map(({ btxEv, btxLabel, btxIsDraw, displayLabel, idx }) => (
+        <tr key={idx} className="mkt-row">
+          <td className="mkt-td-outcome">{displayLabel}</td>
+          {PLATFORMS.map(p => {
+            if (p === 'btx') {
+              return <Cell key={p} ev={btxEv} platform={p} showUSD={showUSD}
+                       onClick={() => onSelectMarket(btxMkt.market_type)} />
+            }
+            const matched = findMatch(btxLabel, btxIsDraw, otherMarkets[p], p)
+            if (!matched) return <td key={p} className="mkt-td-cell mkt-td-empty">—</td>
+            return <Cell key={p} ev={matched} platform={p} showUSD={showUSD}
+                     onClick={() => onSelectMarket(btxMkt.market_type)} />
+          })}
+        </tr>
+      ))}
+    </>
+  )
 }
 
-function MarketCell({ ev, platform, showUSD, onClick }) {
+function Cell({ ev, platform, showUSD, onClick }) {
   const bid = ev.order_book?.bids?.[0]?.price
   const ask = ev.order_book?.asks?.[0]?.price
-  const rawDepth = ev.order_book
-    ? (ev.order_book.bids || []).reduce((s, b) => s + b.size, 0) + (ev.order_book.asks || []).reduce((s, a) => s + a.size, 0)
-    : 0
+  const depth = getDepth(ev)
   return (
     <td className="mkt-td-cell mkt-td-data" onClick={onClick} role="button" tabIndex={0}>
       <div className="mkt-cell-bid">Bid: {bid != null ? `${(bid*100).toFixed(1)}¢` : '—'}</div>
       <div className="mkt-cell-ask">Ask: {ask != null ? `${(ask*100).toFixed(1)}¢` : '—'}</div>
-      <div className="mkt-cell-depth">{formatAmount(rawDepth, platform, showUSD)}</div>
+      <div className="mkt-cell-depth">{formatAmt(depth, platform, showUSD)}</div>
     </td>
   )
 }
