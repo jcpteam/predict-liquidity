@@ -205,14 +205,21 @@ def write_btx_to_db(ref_data):
             is_active, "", "", "", "", 0, "[]", now, now,
         ))
 
-        # BTX mapping: use market_id from markets
+        # BTX mapping: prefer MATCH_ODDS market, fallback to first
         fix_markets = market_by_fixture.get(fid, [])
         if fix_markets:
-            btx_market_id = fix_markets[0].get("id", "")
+            # Find Match Odds market first
+            match_odds_mkt = None
+            for m in fix_markets:
+                if m.get("market_type") == "FOOTBALL_FULL_TIME_MATCH_ODDS":
+                    match_odds_mkt = m
+                    break
+            primary_mkt = match_odds_mkt or fix_markets[0]
+            btx_market_id = primary_mkt.get("id", "")
             btx_mappings.append((fid, "btx", btx_market_id, now))
 
-            # Betfair mapping from BTX market mappings
-            betfair_market_id = get_mapping_value(fix_markets[0].get("mappings", []), "Betfair", "MarketId")
+            # Betfair mapping: use Match Odds market's Betfair MarketId
+            betfair_market_id = get_mapping_value(primary_mkt.get("mappings", []), "Betfair", "MarketId")
             if betfair_market_id:
                 betfair_mappings.append((fid, "betfair", betfair_market_id, now))
 
