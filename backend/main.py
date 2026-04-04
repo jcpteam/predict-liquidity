@@ -210,6 +210,8 @@ async def get_all_btx_markets(unified_id: str):
             select(DBBtxMarket).where(DBBtxMarket.fixture_id == unified_id)
         )).scalars().all()
 
+    print(f"[all-markets] {unified_id}: {len(rows)} btx_markets from DB")
+
     if not rows:
         return await get_event_orderbooks(unified_id)
 
@@ -286,6 +288,12 @@ async def get_all_btx_markets(unified_id: str):
                 betfair_per_btx[key] = evts
             else:
                 other_markets[key] = evts
+
+    types_count = {}
+    for g in btx_market_groups:
+        t = g.get("market_type", "?")
+        types_count[t] = types_count.get(t, 0) + 1
+    print(f"[all-markets] Returning {len(btx_market_groups)} groups: {types_count}")
 
     return {
         "unified_id": mapping.unified_id,

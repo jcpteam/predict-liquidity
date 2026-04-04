@@ -71,6 +71,7 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
                   {ev.end_date && <span className="match-time">🕐 {formatDate(ev.end_date)}</span>}
                 </div>
                 <div className="match-info-row">
+                  {ev.btx_market_count > 1 && <span className="match-stat">{ev.btx_market_count} BTX markets</span>}
                   {ev.market_count != null && <span className="match-stat">{ev.market_count} markets</span>}
                   {ev.liquidity != null && <span className="match-stat">Liq: ${Number(ev.liquidity).toLocaleString()}</span>}
                   {ev.volume_24hr != null && <span className="match-stat">24h: ${Number(ev.volume_24hr).toLocaleString()}</span>}

@@ -377,6 +377,15 @@ class EventMappingStore:
             for uid, mname in maps:
                 mapping_dict.setdefault(uid, []).append(mname)
 
+            # 查询 BTX sub-market 数量
+            from database import DBBtxMarket
+            btx_counts_rows = (await session.execute(
+                select(DBBtxMarket.fixture_id, func.count(DBBtxMarket.id))
+                .where(DBBtxMarket.fixture_id.in_(eids))
+                .group_by(DBBtxMarket.fixture_id)
+            )).all()
+            btx_count_map = {fid: cnt for fid, cnt in btx_counts_rows}
+
             result = []
             for ev in events:
                 linked = mapping_dict.get(ev.unified_id, [])
@@ -400,6 +409,7 @@ class EventMappingStore:
                     "tags": tags,
                     "linked_markets": linked,
                     "is_active": ev.is_active,
+                    "btx_market_count": btx_count_map.get(ev.unified_id, 0),
                 })
             return result
 
