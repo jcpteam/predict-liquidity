@@ -215,6 +215,7 @@ async def get_all_btx_markets(unified_id: str):
 
     btx_market_groups = []
     btx_to_betfair = {}
+    btx_market_id_to_idx = {}  # btx_market_id -> index in btx_market_groups
     for row in rows:
         runners = []
         if row.runners_json:
@@ -223,6 +224,7 @@ async def get_all_btx_markets(unified_id: str):
             except:
                 pass
         mtype = row.market_type or ""
+        idx = len(btx_market_groups)
         btx_market_groups.append({
             "market_id": row.btx_market_id,
             "market_type": mtype,
@@ -232,8 +234,25 @@ async def get_all_btx_markets(unified_id: str):
                          for r in runners],
             "liquidity": 0,
         })
+        btx_market_id_to_idx[row.btx_market_id] = idx
         if row.betfair_market_id:
             btx_to_betfair[row.btx_market_id] = row.betfair_market_id
+
+    # Fetch BTX real-time prices for the primary (Match Odds) market
+    btx_adapter = registry.get("btx")
+    if btx_adapter and "btx" in mapping.mappings:
+        try:
+            btx_primary_id = mapping.mappings["btx"]
+            btx_events = await btx_adapter.fetch_event(btx_primary_id)
+            if btx_events and btx_primary_id in btx_market_id_to_idx:
+                idx = btx_market_id_to_idx[btx_primary_id]
+                btx_market_groups[idx]["outcomes"] = [ev.model_dump(mode="json") for ev in btx_events]
+                btx_market_groups[idx]["liquidity"] = round(sum(
+                    sum(b.size for b in ev.order_book.bids) + sum(a.size for a in ev.order_book.asks)
+                    for ev in btx_events if ev.order_book
+                ), 2)
+        except Exception as e:
+            print(f"[all-markets] BTX price fetch error: {e}")
 
     # Fetch other platforms' data (Betfair per-market, others single)
     other_markets = {}
