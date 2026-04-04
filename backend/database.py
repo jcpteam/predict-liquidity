@@ -111,6 +111,22 @@ class DBMapping(Base):
     )
 
 
+class DBBtxMarket(Base):
+    """BTX 子市场（一个 fixture 有多个 market type）"""
+    __tablename__ = "btx_markets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fixture_id = Column(String(100), nullable=False, index=True)  # = events.unified_id
+    btx_market_id = Column(String(100), nullable=False, unique=True)
+    market_type = Column(String(200), nullable=False)
+    display_name = Column(String(500), nullable=True)
+    betfair_market_id = Column(String(100), nullable=True)
+    runners_json = Column(Text, nullable=True)  # JSON: [{"id":"xxx","name":"Team A"}, ...]
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = ({"mysql_charset": "utf8mb4"},)
+
+
 async def init_db():
     """测试数据库连接（表已通过 init_sync.py 创建）"""
     try:

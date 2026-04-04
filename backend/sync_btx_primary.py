@@ -117,15 +117,60 @@ def fetch_btx_ref_data():
     print("[btx] Streaming ref_data...")
     ref_data = None
     try:
-        stream = stub.StreamMarketData(req, metadata=metadata, timeout=30)
-        for msg in stream:
+        # Step 1: Get fixtures/competitions/competitors from MATCH_ODDS only (small payload)
+        req1 = betting_api_pb2.StreamMarketDataRequest(
+            market_types_to_stream=["FOOTBALL_FULL_TIME_MATCH_ODDS"],
+            stream_ref_data=True, stream_ref_data_after_timestamp=0,
+        )
+        stream1 = stub.StreamMarketData(req1, metadata=metadata, timeout=60)
+        base_data = {"timestamp": 0, "sports": [], "competitions": [], "competitors": [],
+                     "fixtures": [], "markets": []}
+        for msg in stream1:
             if msg.ref_data and msg.ref_data.timestamp > 0:
-                ref_data = MessageToDict(msg.ref_data, preserving_proto_field_name=True)
-                print(f"[btx] Got ref_data: {len(ref_data.get('fixtures', []))} fixtures, "
-                      f"{len(ref_data.get('markets', []))} markets, "
-                      f"{len(ref_data.get('competitions', []))} competitions, "
-                      f"{len(ref_data.get('competitors', []))} competitors")
+                rd = MessageToDict(msg.ref_data, preserving_proto_field_name=True)
+                for key in base_data:
+                    if key == "timestamp":
+                        base_data[key] = rd.get(key, 0)
+                    else:
+                        base_data[key].extend(rd.get(key, []))
+                if base_data["fixtures"] and base_data["competitors"]:
+                    break
+        stream1.cancel()
+        print(f"[btx] Step 1 (MATCH_ODDS): {len(base_data['fixtures'])}f {len(base_data['markets'])}m "
+              f"{len(base_data['competitions'])}c {len(base_data['competitors'])}r")
+
+        # Step 2: Get all other market types (only markets, no fixtures needed)
+        other_types = ["FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+                       "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+                       "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
+                       "FOOTBALL_FULL_TIME_CORRECT_SCORE"]
+        req2 = betting_api_pb2.StreamMarketDataRequest(
+            market_types_to_stream=other_types,
+            stream_ref_data=True, stream_ref_data_after_timestamp=0,
+        )
+        stream2 = stub.StreamMarketData(req2, metadata=metadata, timeout=120)
+        extra_markets = 0
+        for msg in stream2:
+            if msg.ref_data and msg.ref_data.timestamp > 0:
+                rd = MessageToDict(msg.ref_data, preserving_proto_field_name=True)
+                new_mkts = rd.get("markets", [])
+                base_data["markets"].extend(new_mkts)
+                extra_markets += len(new_mkts)
+                # Also merge any new fixtures/competitors
+                base_data["fixtures"].extend(rd.get("fixtures", []))
+                base_data["competitors"].extend(rd.get("competitors", []))
+                base_data["competitions"].extend(rd.get("competitions", []))
+            if msg.update_type == 4:  # CAUGHT_UP
                 break
+            # Stop after getting a good amount of markets
+            if extra_markets > 4000:
+                break
+        stream2.cancel()
+        print(f"[btx] Step 2 (other types): +{extra_markets}m")
+
+        ref_data = base_data
+        print(f"[btx] Final: {len(ref_data['fixtures'])}f {len(ref_data['markets'])}m "
+              f"{len(ref_data['competitions'])}c {len(ref_data['competitors'])}r")
     except grpc.RpcError as e:
         if ref_data:
             print(f"[btx] Stream ended ({e.code().name}), but got data")
@@ -168,6 +213,19 @@ def write_btx_to_db(ref_data):
     cur.execute("DELETE FROM events")
     cur.execute("DELETE FROM market_mappings")
     cur.execute("DELETE FROM leagues")
+    # Create btx_markets table if not exists
+    cur.execute("""CREATE TABLE IF NOT EXISTS btx_markets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        fixture_id VARCHAR(100) NOT NULL,
+        btx_market_id VARCHAR(100) NOT NULL UNIQUE,
+        market_type VARCHAR(200) NOT NULL,
+        display_name VARCHAR(500),
+        betfair_market_id VARCHAR(100),
+        runners_json TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fixture (fixture_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+    cur.execute("DELETE FROM btx_markets")
     conn.commit()
     print("[db] Cleared old data")
 
@@ -235,6 +293,37 @@ def write_btx_to_db(ref_data):
         cur.executemany(mapping_sql, all_mappings[i:i+batch])
         conn.commit()
     print(f"[db] Inserted {len(btx_mappings)} BTX + {len(betfair_mappings)} Betfair mappings")
+
+    # Insert all BTX sub-markets (all market types per fixture)
+    btx_market_sql = """INSERT IGNORE INTO btx_markets
+        (fixture_id, btx_market_id, market_type, display_name, betfair_market_id, runners_json, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)"""
+    btx_market_rows = []
+    for m in markets:
+        fid = m.get("fixture_id", "")
+        if not fid:
+            continue
+        mid = m.get("id", "")
+        mtype = m.get("market_type", "")
+        dname = get_en_name(m.get("display_names", []))
+        bf_mid = get_mapping_value(m.get("mappings", []), "Betfair", "MarketId")
+        # Build runners with names from competitors
+        runners = []
+        for r in m.get("runners", []):
+            rid = r.get("id", "")
+            rname = competitor_map.get(rid, rid)
+            if rid == "DRAW":
+                rname = "Draw"
+            elif rid in ("OVER", "UNDER"):
+                rname = rid.title()
+            runners.append({"id": rid, "name": rname})
+        btx_market_rows.append((fid, mid, mtype, dname, bf_mid or None,
+                                json.dumps(runners), now))
+
+    for i in range(0, len(btx_market_rows), batch):
+        cur.executemany(btx_market_sql, btx_market_rows[i:i+batch])
+        conn.commit()
+    print(f"[db] Inserted {len(btx_market_rows)} BTX sub-markets")
 
     # Update leagues
     cur.execute("DELETE FROM leagues")
