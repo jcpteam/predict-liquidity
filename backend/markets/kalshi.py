@@ -187,6 +187,7 @@ class KalshiAdapter(BaseMarketAdapter):
             resp = await self.client.get(
                 f"{self.BASE_URL}/events/{event_ticker}",
                 params={"with_nested_markets": "true"},
+                timeout=15.0,
             )
             resp.raise_for_status()
             ev = resp.json().get("event", {})
