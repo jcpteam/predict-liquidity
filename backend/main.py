@@ -225,7 +225,12 @@ async def get_all_btx_markets(unified_id: str):
         btx_prices = {}  # market_id -> [MarketEvent]
 
         msg_count = 0
+        import time as _time
+        t0 = _time.time()
         async for msg in stream:
+            msg_count += 1
+            if _time.time() - t0 > 30:
+                break
             msg_count += 1
             # Extract ref_data
             if msg.ref_data and msg.ref_data.timestamp > 0:
@@ -257,8 +262,10 @@ async def get_all_btx_markets(unified_id: str):
                         if has_data or not existing:
                             btx_prices[mid] = events
 
-            # Wait for ref_data + at least one price message
-            if msg_count >= 8 or (fixture_id and msg_count >= 3):
+            # Wait for ref_data + price snapshot (can take 15-20s)
+            if fixture_id and btx_prices and _time.time() - t0 > 5:
+                break
+            if msg_count >= 20:
                 break
 
         stream.cancel()

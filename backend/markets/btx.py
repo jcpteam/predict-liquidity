@@ -224,9 +224,11 @@ class BTXAdapter(BaseMarketAdapter):
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return None
-            count = 0
+            import time
+            t0 = time.time()
             async for msg in stream:
-                count += 1
+                if time.time() - t0 > 30:
+                    break
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
@@ -235,8 +237,6 @@ class BTXAdapter(BaseMarketAdapter):
                                 if ev.order_book.bids or ev.order_book.asks:
                                     stream.cancel()
                                     return ev.order_book
-                if count >= 10:
-                    break
             stream.cancel()
             return None
         except Exception as e:
@@ -245,17 +245,19 @@ class BTXAdapter(BaseMarketAdapter):
 
     async def fetch_event(self, market_id: str) -> list[MarketEvent]:
         """Fetch all outcomes for a BTX market.
-        Returns results from initial snapshot even if orderbooks are empty.
+        BTX initial price snapshot can take 15-20s to arrive.
         """
         try:
             await self._load_runner_names()
             stream = await self.stream_market_data(stream_prices=True)
             if stream is None:
                 return []
-            count = 0
+            import time
+            t0 = time.time()
             best_events = []
             async for msg in stream:
-                count += 1
+                if time.time() - t0 > 30:
+                    break
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
@@ -265,9 +267,7 @@ class BTXAdapter(BaseMarketAdapter):
                             stream.cancel()
                             return events
                         elif not best_events:
-                            best_events = events  # Keep first match even if empty
-                if count >= 10:
-                    break
+                            best_events = events
             stream.cancel()
             return best_events
         except Exception as e:
