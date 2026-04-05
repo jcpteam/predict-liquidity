@@ -201,8 +201,8 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
       {/* Market-level Liquidity + Spread row */}
       <tr className="mkt-row mkt-row-stats">
         <td className="mkt-td-outcome mkt-td-stats-label">
-          <Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Spread = Σ(best bid probability) across outcomes; fair market ≈ 100¢.">
-            Liquidity / Spread ⓘ
+          <Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Overround = Σ(best bid probability) across all outcomes; fair market = 100¢, >100¢ = house edge.">
+            Liquidity / Overround ⓘ
           </Tip>
         </td>
         {PLATFORMS.map(p => {
@@ -219,9 +219,9 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
                   {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
                 </div>
               </Tip>
-              <Tip text={`Spread = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob = 1/odds, then Σ(prob)×100.' : ''} Fair market ≈ 100¢. >100¢ = overround (house edge).`}>
+              <Tip text={`Overround = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob = 1/odds, then Σ(prob)×100.' : ''} Fair market = 100¢. >100¢ = overround (house edge).`}>
                 <div className="mkt-stat-spread">
-                  Spread: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
+                  Overround: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
                 </div>
               </Tip>
             </td>
@@ -261,9 +261,9 @@ function Cell({ ev, platform, showUSD, onClick }) {
           {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)})</span>}
         </div>
       </Tip>
-      <Tip text={`Spread = Best Ask − Best Bid (as probability).${isOdds && bid && ask ? ' = (1/' + (1/ask).toFixed(2) + ') − (1/' + (1/bid).toFixed(2) + ')' : ''} Smaller = tighter market.`}>
+      <Tip text={`Bid-Ask Spread = Best Ask − Best Bid for this outcome. Smaller = tighter, more liquid market.`}>
         <div className="mkt-cell-spread-detail">
-          Spread: {spread != null ? `${(Math.abs(spread) * 100).toFixed(1)}¢` : '—'}
+          Bid-Ask Spread: {spread != null ? `${(Math.abs(spread) * 100).toFixed(1)}¢` : '—'}
         </div>
       </Tip>
     </td>
