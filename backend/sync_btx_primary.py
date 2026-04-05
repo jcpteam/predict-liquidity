@@ -216,9 +216,9 @@ def write_btx_to_db(ref_data):
     cur = conn.cursor()
     print("[db] Connected")
 
-    # Clear old data
+    # Clear old data (preserve kalshi mappings)
     cur.execute("DELETE FROM events")
-    cur.execute("DELETE FROM market_mappings")
+    cur.execute("DELETE FROM market_mappings WHERE market_name IN ('btx', 'betfair', 'polymarket')")
     cur.execute("DELETE FROM leagues")
     # Create btx_markets table if not exists
     cur.execute("""CREATE TABLE IF NOT EXISTS btx_markets (
