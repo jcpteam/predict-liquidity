@@ -26,19 +26,54 @@ function isDraw(label) {
 function normLabel(label) {
   if (!label) return ''
   let s = label.toLowerCase().trim()
-  // Strip "FC", "AFC", "SC" etc
   s = s.replace(/\b(fc|afc|sc|ac|cf|cd|fk|nk|sk)\b/gi, '').trim()
-  // Strip trailing/leading whitespace and dots
   s = s.replace(/[.\-]+$/, '').replace(/^[.\-]+/, '').trim()
   s = s.replace(/\s+/g, ' ')
   return s
 }
 
-// Simple word overlap similarity
+// Common football team aliases
+const TEAM_ALIASES = {
+  'wolves': 'wolverhampton',
+  'wolverhampton wanderers': 'wolverhampton',
+  'spurs': 'tottenham',
+  'tottenham hotspur': 'tottenham',
+  'man utd': 'manchester united',
+  'man united': 'manchester united',
+  'man city': 'manchester city',
+  'nottm forest': 'nottingham forest',
+  'nott forest': 'nottingham forest',
+  'brighton and hove albion': 'brighton',
+  'brighton hove albion': 'brighton',
+  'west ham united': 'west ham',
+  'newcastle united': 'newcastle',
+  'leicester city': 'leicester',
+  'sheffield united': 'sheffield',
+  'crystal palace': 'crystal palace',
+  'atletico de madrid': 'atletico',
+  'atletico madrid': 'atletico',
+  'real madrid': 'real madrid',
+  'barcelona': 'barcelona',
+  'bayern munchen': 'bayern munich',
+  'bayern münchen': 'bayern munich',
+  'borussia dortmund': 'dortmund',
+  'paris saint germain': 'psg',
+  'paris saint-germain': 'psg',
+  'inter milan': 'inter',
+  'internazionale': 'inter',
+  'ac milan': 'milan',
+}
+
+function resolveAlias(name) {
+  const n = normLabel(name)
+  return TEAM_ALIASES[n] || n
+}
+
+// Simple word overlap similarity with alias resolution
 function labelSimilarity(a, b) {
   if (!a || !b) return 0
-  const na = normLabel(a)
-  const nb = normLabel(b)
+  const na = resolveAlias(a)
+  const nb = resolveAlias(b)
   if (na === nb) return 1
   if (na.includes(nb) || nb.includes(na)) return 0.85
   const wa = new Set(na.split(' '))
