@@ -1,5 +1,13 @@
 import React, { useState } from 'react'
 
+function isLive(eventTime) {
+  if (!eventTime) return false
+  const start = new Date(eventTime)
+  const now = new Date()
+  // Match started (past start time) and within 3 hours (football ~2h + buffer)
+  return now >= start && (now - start) < 3 * 60 * 60 * 1000
+}
+
 function parseTeams(title) {
   // "Team A vs. Team B" or "Team A vs Team B" or "Team A v Team B"
   const parts = title.split(/\s+(?:vs\.?|v\.?|@)\s+/i)
@@ -78,6 +86,7 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
                 </div>
                 <div className="match-badges">
                   {ev.is_active === false && <span className="market-badge-sm" style={{background:'#da363333',color:'#f85149'}}>ENDED</span>}
+                  {isLive(ev.event_time) && <span className="market-badge-sm badge-live">● LIVE</span>}
                   {ev.linked_markets.map(m => (
                     <span key={m} className="market-badge-sm">{m}</span>
                   ))}

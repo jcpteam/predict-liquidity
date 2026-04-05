@@ -615,3 +615,14 @@ button:hover { background: #2ea043; }
 .mkt-cell-liq-detail { font-size: 11px; color: #8b949e; margin-top: 4px; }
 .mkt-cell-spread-detail { font-size: 11px; color: #d29922; }
 .mkt-cell-conv { font-size: 10px; color: #58a6ff; }
+
+/* ── LIVE badge ── */
+.badge-live {
+  background: #da363333;
+  color: #f85149;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

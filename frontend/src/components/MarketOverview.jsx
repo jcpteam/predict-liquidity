@@ -69,6 +69,13 @@ function Tip({ text, children }) {
   return <span className="tip-wrap" title={text}>{children}</span>
 }
 
+function isLive(eventTime) {
+  if (!eventTime) return false
+  const start = new Date(eventTime)
+  const now = new Date()
+  return now >= start && (now - start) < 3 * 60 * 60 * 1000
+}
+
 export default function MarketOverview({ unifiedId, displayName, onSelectMarket }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -99,6 +106,7 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
         <h2>{displayName || data.display_name}</h2>
         <div className="detail-title-meta">
           {data.event_time && <span className="detail-time">🕐 {new Date(data.event_time).toLocaleString()}</span>}
+          {data.event_time && isLive(data.event_time) && <span className="live-dot">● LIVE</span>}
           <button className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>
             {showUSD ? '$ All USD' : '🔄 Convert to USD'}
           </button>
@@ -213,13 +221,13 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
           const usdLiq = toUSD(rawLiq, p)
           return (
             <td key={p} className="mkt-td-cell mkt-td-stats">
-              <Tip text={`Liquidity = Σ(all bid sizes + ask sizes) across all outcomes in ${p.toUpperCase()}.${isBf ? ' GBP→USD: amount × ' + GBP_TO_USD : ''}`}>
+              <Tip text={`Liquidity = Σ(all bid+ask sizes) in ${p.toUpperCase()}.${isBf ? ` £${rawLiq.toFixed(0)} GBP × ${GBP_TO_USD} = $${usdLiq.toFixed(0)} USD` : ''}`}>
                 <div className="mkt-stat-liq">
-                  {formatAmt(rawLiq, p, false)}
+                  Liquidity: {formatAmt(rawLiq, p, false)}
                   {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
                 </div>
               </Tip>
-              <Tip text={`Overround = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob = 1/odds, then Σ(prob)×100.' : ''} Fair market = 100¢. >100¢ = overround (house edge).`}>
+              <Tip text={`Overround = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob=1/odds, Σ(prob)×100.' : ''} Fair=100¢, >100¢=house edge.`}>
                 <div className="mkt-stat-spread">
                   Overround: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
                 </div>
@@ -233,37 +241,52 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
 }
 
 function Cell({ ev, platform, showUSD, onClick }) {
-  const bid = getBestBid(ev)
+  const bid = getBestBid(ev)  // stored as probability (0~1)
   const ask = getBestAsk(ev)
   const isOdds = ODDS_PLATFORMS.has(platform)
   const isBf = platform === 'betfair'
 
-  // Per-outcome liquidity = bid sizes + ask sizes
+  // Convert probability back to decimal odds: odds = 1/prob
+  const bidOdds = bid && bid > 0 ? (1 / bid).toFixed(2) : null
+  const askOdds = ask && ask > 0 ? (1 / ask).toFixed(2) : null
+
+  // Per-outcome liquidity
   const bidDepth = ev?.order_book?.bids?.reduce((s, b) => s + b.size, 0) || 0
   const askDepth = ev?.order_book?.asks?.reduce((s, a) => s + a.size, 0) || 0
   const liq = bidDepth + askDepth
   const usdLiq = toUSD(liq, platform)
 
-  // Per-outcome spread = ask - bid (in probability)
-  const spread = (bid != null && ask != null) ? ask - bid : null
+  // Per-outcome bid-ask spread (in probability)
+  const spreadProb = (bid != null && ask != null) ? Math.abs(ask - bid) : null
+  // In odds: spread = askOdds - bidOdds
+  const spreadOdds = (bidOdds && askOdds) ? (parseFloat(askOdds) - parseFloat(bidOdds)).toFixed(2) : null
 
   return (
     <td className="mkt-td-cell mkt-td-data" onClick={onClick} role="button" tabIndex={0}>
-      <Tip text={`Best Bid: highest buy price.${isOdds ? ' Decimal odds (lower = more likely)' : ' Probability ¢ (higher = more likely)'}`}>
-        <div className="mkt-cell-bid">Bid: {formatPrice(bid, platform)}</div>
-      </Tip>
-      <Tip text={`Best Ask: lowest sell price.${isOdds ? ' Decimal odds' : ' Probability ¢'}`}>
-        <div className="mkt-cell-ask">Ask: {formatPrice(ask, platform)}</div>
-      </Tip>
-      <Tip text={`Liquidity = Σ bid sizes + Σ ask sizes for this outcome.${isBf ? ' £' + liq.toFixed(0) + ' GBP × ' + GBP_TO_USD + ' = $' + usdLiq.toFixed(0) + ' USD' : ''}`}>
-        <div className="mkt-cell-liq-detail">
-          Liquidity: {formatAmt(liq, platform, false)}
-          {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)})</span>}
+      <Tip text={isOdds ? `Best Bid (decimal odds). Lower odds = higher probability. prob = 1/odds` : `Best Bid (probability ¢)`}>
+        <div className="mkt-cell-bid">
+          Bid: {isOdds ? (bidOdds || '—') : (bid != null ? `${(bid*100).toFixed(1)}¢` : '—')}
         </div>
       </Tip>
-      <Tip text={`Bid-Ask Spread = Best Ask − Best Bid for this outcome. Smaller = tighter, more liquid market.`}>
+      <Tip text={isOdds ? `Best Ask (decimal odds). prob = 1/odds` : `Best Ask (probability ¢)`}>
+        <div className="mkt-cell-ask">
+          Ask: {isOdds ? (askOdds || '—') : (ask != null ? `${(ask*100).toFixed(1)}¢` : '—')}
+        </div>
+      </Tip>
+      <Tip text={`Liquidity = Σ(bid sizes) + Σ(ask sizes).${isBf ? ` £${liq.toFixed(0)} × ${GBP_TO_USD} = $${usdLiq.toFixed(0)}` : ''}`}>
+        <div className="mkt-cell-liq-detail">
+          Liq: {formatAmt(liq, platform, false)}
+          {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
+        </div>
+      </Tip>
+      <Tip text={isOdds
+        ? `Bid-Ask Spread: odds diff = ${spreadOdds || '—'}, prob diff = ${spreadProb != null ? (spreadProb*100).toFixed(1)+'¢' : '—'}. Formula: |1/ask_odds − 1/bid_odds|×100`
+        : `Bid-Ask Spread = |Ask − Bid|. Smaller = tighter market.`}>
         <div className="mkt-cell-spread-detail">
-          Bid-Ask Spread: {spread != null ? `${(Math.abs(spread) * 100).toFixed(1)}¢` : '—'}
+          Spread: {isOdds
+            ? (spreadOdds != null ? `${spreadOdds} odds` : '—')
+            : (spreadProb != null ? `${(spreadProb*100).toFixed(1)}¢` : '—')}
+          {isOdds && spreadProb != null && <span className="mkt-cell-conv"> ({(spreadProb*100).toFixed(1)}¢)</span>}
         </div>
       </Tip>
     </td>
