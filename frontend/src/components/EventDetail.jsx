@@ -99,7 +99,7 @@ function buildOutcomeColumns(marketsData) {
         }
       }
 
-      col.markets[mname] = bestScore >= 0.3 ? bestEv : null
+      col.markets[mname] = bestScore >= 0.2 ? bestEv : null
     }
 
     return col
@@ -317,6 +317,12 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
               <div className="outcome-col-header">{col.outcome}</div>
               {MARKET_ORDER.map(mname => {
                 const ev = col.markets[mname]
+                const hasOb = ev && ev.order_book && (ev.order_book.bids?.length > 0 || ev.order_book.asks?.length > 0)
+                const bidDepth = hasOb ? ev.order_book.bids.reduce((s, b) => s + b.size, 0) : 0
+                const askDepth = hasOb ? ev.order_book.asks.reduce((s, a) => s + a.size, 0) : 0
+                const availLiq = bidDepth + askDepth
+                const availVol = hasOb ? (ev.order_book.bids.reduce((s, b) => s + b.size * b.price, 0) + ev.order_book.asks.reduce((s, a) => s + a.size * a.price, 0)) : 0
+                const matchedVol = ev?.volume_24h
                 return (
                   <div key={mname} className="outcome-market-cell">
                     <div className="cell-market-label">{mname.toUpperCase()}</div>
@@ -330,6 +336,20 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
                           {getBestAsk(ev) != null && <span className="cell-ask">Ask: {(getBestAsk(ev) * 100).toFixed(1)}¢</span>}
                         </div>
                         <OrderBookChart orderBook={ev.order_book} />
+                        <div className="cell-liquidity-stats">
+                          <div className="cell-stat" title="Available Liquidity = Σ(bid sizes + ask sizes) — total order depth">
+                            Avail. Liquidity: ${availLiq.toFixed(0)}
+                          </div>
+                          <div className="cell-stat" title="Available Volume = Σ(size × price) — dollar-weighted depth">
+                            Avail. Volume: ${availVol.toFixed(0)}
+                          </div>
+                          <div className="cell-stat cell-stat-matched" title="Matched Liquidity — total matched/traded amount (from exchange)">
+                            Matched Liq: {matchedVol != null ? `$${Number(matchedVol).toFixed(0)}` : '—'}
+                          </div>
+                          <div className="cell-stat cell-stat-matched" title="Matched Volume — actual traded volume">
+                            Matched Vol: {matchedVol != null ? `$${Number(matchedVol).toFixed(0)}` : '—'}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

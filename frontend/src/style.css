@@ -626,3 +626,21 @@ button:hover { background: #2ea043; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* ── Orderbook cell liquidity stats ── */
+.cell-liquidity-stats {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cell-stat {
+  font-size: 11px;
+  color: #8b949e;
+  cursor: help;
+}
+.cell-stat-matched {
+  color: #d29922;
+}

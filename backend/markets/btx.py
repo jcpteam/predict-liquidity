@@ -185,9 +185,11 @@ class BTXAdapter(BaseMarketAdapter):
         names = runner_names or self._runner_names
         for mp in prices_msg.market_prices:
             mid = mp.market_id
+            market_traded = mp.traded  # total matched volume for this market (USD)
             events = []
             for rp in mp.runner_prices:
                 rid = rp.runner_id
+                runner_traded = rp.traded  # matched volume for this runner
                 bids = []
                 for bp in rp.back_prices:
                     odds = _decimal_to_float(bp.price)
@@ -214,7 +216,7 @@ class BTXAdapter(BaseMarketAdapter):
                     outcome=display_name,
                     order_book=ob,
                     last_price=round(1.0 / ltp, 4) if ltp and ltp > 1 else ltp,
-                    volume_24h=None,
+                    volume_24h=float(runner_traded) if runner_traded else (float(market_traded) if market_traded else None),
                 ))
             if events:
                 result[mid] = events

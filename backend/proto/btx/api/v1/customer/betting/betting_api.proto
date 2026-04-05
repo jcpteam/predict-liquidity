@@ -117,14 +117,14 @@ message PriceStreamingMessage {
 message MarketPrices {
   string market_id = 1;
   int64 timestamp = 2;
-  // field 3 reserved
+  uint64 traded = 3;
   repeated RunnerPrices runner_prices = 4;
   int32 status = 5;
 }
 
 message RunnerPrices {
   string runner_id = 1;
-  // field 2 reserved
+  uint64 traded = 2;
   repeated PriceLevel back_prices = 3;
   repeated PriceLevel lay_prices = 4;
   DecimalNumber last_traded_price = 5;
