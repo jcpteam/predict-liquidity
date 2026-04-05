@@ -347,7 +347,7 @@ class EventMappingStore:
             rows = (await session.execute(
                 select(DBEvent.league, func.count(DBEvent.unified_id))
                 .group_by(DBEvent.league)
-                .order_by(func.count(DBEvent.unified_id).desc())
+                .order_by(DBEvent.league.asc())
             )).all()
             return [{"name": name, "count": cnt} for name, cnt in rows if cnt > 0]
 
