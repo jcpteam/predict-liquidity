@@ -360,6 +360,7 @@ class EventMappingStore:
                     DBEvent.volume_24hr, DBEvent.volume, DBEvent.image,
                     DBEvent.market_count, DBEvent.tags_json, DBEvent.is_active,
                 ).where(DBEvent.league == league)
+                .order_by(DBEvent.event_time.asc())
             )).all()
 
             if not events:

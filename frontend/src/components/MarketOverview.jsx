@@ -275,8 +275,8 @@ function Cell({ ev, platform, showUSD, onClick }) {
       </Tip>
       <Tip text={`Liquidity = Σ(bid sizes) + Σ(ask sizes).${isBf ? ` £${liq.toFixed(0)} × ${GBP_TO_USD} = $${usdLiq.toFixed(0)}` : ''}`}>
         <div className="mkt-cell-liq-detail">
-          Liq: {formatAmt(liq, platform, false)}
-          {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
+          Liquidity: {formatAmt(liq, platform, false)}
+          {platform !== 'btx' && platform !== 'kalshi' && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
         </div>
       </Tip>
       <Tip text={isOdds
