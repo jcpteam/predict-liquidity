@@ -644,3 +644,19 @@ button:hover { background: #2ea043; }
 .cell-stat-matched {
   color: #d29922;
 }
+
+/* ── Summary Liquidity table ── */
+.liq-formulas {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #0d1117;
+  border-radius: 6px;
+  border: 1px solid #21262d;
+}
+.liq-formulas p {
+  font-size: 11px;
+  color: #8b949e;
+  margin: 2px 0;
+}
+.matched-val { color: #d29922; }
+.overround-row td { border-top: 2px solid #30363d; font-weight: 600; color: #d29922; }

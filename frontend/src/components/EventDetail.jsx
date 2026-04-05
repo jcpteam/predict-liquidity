@@ -352,12 +352,6 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
               <div className="outcome-col-header">{col.outcome}</div>
               {MARKET_ORDER.map(mname => {
                 const ev = col.markets[mname]
-                const hasOb = ev && ev.order_book && (ev.order_book.bids?.length > 0 || ev.order_book.asks?.length > 0)
-                const bidDepth = hasOb ? ev.order_book.bids.reduce((s, b) => s + b.size, 0) : 0
-                const askDepth = hasOb ? ev.order_book.asks.reduce((s, a) => s + a.size, 0) : 0
-                const availLiq = bidDepth + askDepth
-                const availVol = hasOb ? (ev.order_book.bids.reduce((s, b) => s + b.size * b.price, 0) + ev.order_book.asks.reduce((s, a) => s + a.size * a.price, 0)) : 0
-                const matchedVol = ev?.volume_24h
                 return (
                   <div key={mname} className="outcome-market-cell">
                     <div className="cell-market-label">{mname.toUpperCase()}</div>
@@ -371,20 +365,6 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
                           {getBestAsk(ev) != null && <span className="cell-ask">Ask: {(getBestAsk(ev) * 100).toFixed(1)}¢</span>}
                         </div>
                         <OrderBookChart orderBook={ev.order_book} />
-                        <div className="cell-liquidity-stats">
-                          <div className="cell-stat" title="Available Liquidity = Σ(bid sizes + ask sizes) — total order depth">
-                            Avail. Liquidity: ${availLiq.toFixed(0)}
-                          </div>
-                          <div className="cell-stat" title="Available Volume = Σ(size × price) — dollar-weighted depth">
-                            Avail. Volume: ${availVol.toFixed(0)}
-                          </div>
-                          <div className="cell-stat cell-stat-matched" title="Matched Liquidity — total matched/traded amount (from exchange)">
-                            Matched Liq: {matchedVol != null ? `$${Number(matchedVol).toFixed(0)}` : '—'}
-                          </div>
-                          <div className="cell-stat cell-stat-matched" title="Matched Volume — actual traded volume">
-                            Matched Vol: {matchedVol != null ? `$${Number(matchedVol).toFixed(0)}` : '—'}
-                          </div>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -395,58 +375,70 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
         </div>
       )}
 
-      {columns.length > 0 && <SpreadSummary columns={columns} />}
+      {columns.length > 0 && <LiquiditySummary columns={columns} />}
     </div>
   )
 }
 
-function SpreadSummary({ columns }) {
-  const marketSpreads = {}
+function LiquiditySummary({ columns }) {
+  // Compute per-market stats across all outcomes
+  const stats = {}
   for (const mname of MARKET_ORDER) {
-    const outcomeBids = {}
+    let availLiq = 0, availVol = 0, matchedLiq = 0, hasMatched = false, bidSum = 0, bidCount = 0
     for (const col of columns) {
-      const bid = getBestBid(col.markets[mname])
-      outcomeBids[col.outcome] = bid
+      const ev = col.markets[mname]
+      if (ev && ev.order_book) {
+        const bids = ev.order_book.bids || []
+        const asks = ev.order_book.asks || []
+        availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
+        availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
+        if (bids.length) { bidSum += bids[0].price; bidCount++ }
+      }
+      if (ev && ev.volume_24h != null) { matchedLiq += Number(ev.volume_24h); hasMatched = true }
     }
-    const values = Object.values(outcomeBids).filter(v => v != null)
-    marketSpreads[mname] = {
-      outcomeBids,
-      totalSpread: values.length > 0 ? values.reduce((s, v) => s + v, 0) : null,
-    }
+    stats[mname] = { availLiq, availVol, matchedLiq: hasMatched ? matchedLiq : null, overround: bidCount > 0 ? bidSum : null }
   }
 
   return (
-    <div className="spread-summary">
-      <h3>Spread Summary</h3>
-      <p className="spread-formula">Spread = Sum of Best Bids across all outcomes</p>
-      <div className="outcome-columns spread-columns">
-        {columns.map(col => (
-          <div key={col.outcome} className="outcome-col spread-col">
-            <div className="outcome-col-header">{col.outcome}</div>
-            {MARKET_ORDER.map(mname => {
-              const bid = marketSpreads[mname]?.outcomeBids[col.outcome]
-              return (
-                <div key={mname} className="spread-cell">
-                  <span className="cell-market-label">{mname.toUpperCase()}</span>
-                  <span className="spread-value">{bid != null ? `${(bid * 100).toFixed(2)}¢` : '—'}</span>
-                </div>
-              )
-            })}
-          </div>
-        ))}
-        <div className="outcome-col spread-col spread-total-col">
-          <div className="outcome-col-header">Total</div>
-          {MARKET_ORDER.map(mname => {
-            const total = marketSpreads[mname]?.totalSpread
-            return (
-              <div key={mname} className="spread-cell">
-                <span className="cell-market-label">{mname.toUpperCase()}</span>
-                <span className="spread-value spread-total">{total != null ? `${(total * 100).toFixed(2)}¢` : '—'}</span>
-              </div>
-            )
-          })}
-        </div>
+    <div className="liquidity-summary">
+      <h3>Summary Liquidity</h3>
+      <div className="liq-formulas">
+        <p>Available Liquidity = Σ(bid sizes + ask sizes) across all outcomes</p>
+        <p>Available Volume = Σ(size × probability) across all outcomes</p>
+        <p>Matched Liquidity = Total traded/matched amount from exchange</p>
+        <p>Matched Volume = Actual executed trade volume</p>
+        <p>Overround = Σ(best bid probability) — fair market = 100¢</p>
       </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            {MARKET_ORDER.map(m => <th key={m}>{m.toUpperCase()}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td title="Σ(bid sizes + ask sizes) for all outcomes">Available Liquidity</td>
+            {MARKET_ORDER.map(m => <td key={m}>${stats[m].availLiq.toFixed(0)}</td>)}
+          </tr>
+          <tr>
+            <td title="Σ(size × price) for all outcomes — dollar-weighted depth">Available Volume</td>
+            {MARKET_ORDER.map(m => <td key={m}>${stats[m].availVol.toFixed(0)}</td>)}
+          </tr>
+          <tr>
+            <td title="Total matched/traded amount from exchange API">Matched Liquidity</td>
+            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
+          </tr>
+          <tr>
+            <td title="Actual executed trade volume">Matched Volume</td>
+            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
+          </tr>
+          <tr className="overround-row">
+            <td title="Σ(best bid probability) — fair market ≈ 100¢, >100¢ = house edge">Overround</td>
+            {MARKET_ORDER.map(m => <td key={m}>{stats[m].overround != null ? `${(stats[m].overround * 100).toFixed(1)}¢` : '—'}</td>)}
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }
