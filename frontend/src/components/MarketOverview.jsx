@@ -40,13 +40,30 @@ function getLabel(ev, platform) {
 function normLabel(s) {
   return (s || '').toLowerCase().replace(/\b(fc|afc|sc|ac|cf)\b/gi, '').trim().replace(/\s+/g, ' ')
 }
+const MKT_ALIASES = {
+  'wolves': 'wolverhampton', 'wolverhampton wanderers': 'wolverhampton',
+  'spurs': 'tottenham', 'tottenham hotspur': 'tottenham',
+  'man utd': 'manchester united', 'man united': 'manchester united',
+  'man city': 'manchester city', 'nottm forest': 'nottingham forest',
+  'nott forest': 'nottingham forest', 'west ham united': 'west ham',
+  'newcastle united': 'newcastle', 'brighton and hove albion': 'brighton',
+  'brighton hove albion': 'brighton', 'leicester city': 'leicester',
+  'atletico de madrid': 'atletico', 'atletico madrid': 'atletico',
+  'borussia dortmund': 'dortmund', 'paris saint germain': 'psg',
+  'paris saint-germain': 'psg', 'inter milan': 'inter', 'internazionale': 'inter',
+  'ac milan': 'milan', 'bayern munchen': 'bayern munich', 'bayern münchen': 'bayern munich',
+}
+function resolveAlias(name) {
+  const n = normLabel(name)
+  return MKT_ALIASES[n] || n
+}
 function findMatch(btxLabel, btxIsDraw, events, platform) {
   if (!events || !Array.isArray(events)) return null
   for (const ev of events) {
     const l = getLabel(ev, platform)
     if (btxIsDraw && isDraw(l)) return ev
     if (!btxIsDraw && !isDraw(l)) {
-      const a = normLabel(btxLabel), b = normLabel(l)
+      const a = resolveAlias(btxLabel), b = resolveAlias(l)
       if (a === b || a.includes(b) || b.includes(a)) return ev
     }
   }

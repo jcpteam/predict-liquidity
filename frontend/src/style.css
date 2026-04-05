@@ -660,3 +660,6 @@ button:hover { background: #2ea043; }
 }
 .matched-val { color: #d29922; }
 .overround-row td { border-top: 2px solid #30363d; font-weight: 600; color: #d29922; }
+
+.spread-row td { color: #58a6ff; font-size: 12px; }
+.spread-row td:first-child { font-weight: 600; }
