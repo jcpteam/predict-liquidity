@@ -169,7 +169,13 @@ class BTXAdapter(BaseMarketAdapter):
         if not self._stub:
             return None
         if market_types is None:
-            market_types = ["FOOTBALL_FULL_TIME_MATCH_ODDS"]
+            market_types = [
+                "FOOTBALL_FULL_TIME_MATCH_ODDS",
+                "FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+                "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+                "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
+                "FOOTBALL_FULL_TIME_CORRECT_SCORE",
+            ]
         req = self._pb2.StreamMarketDataRequest(
             market_types_to_stream=market_types,
             stream_prices=stream_prices,
@@ -189,7 +195,17 @@ class BTXAdapter(BaseMarketAdapter):
             events = []
             for rp in mp.runner_prices:
                 rid = rp.runner_id
-                runner_traded = rp.traded  # matched volume for this runner
+                runner_traded = rp.traded if rp.traded else 0
+                # Get handicap value for Asian Handicap / Goal Lines
+                handicap_str = ""
+                if rp.HasField('handicap') and rp.handicap.value != 0:
+                    hval = rp.handicap.value
+                    hdps = rp.handicap.dps
+                    # Handle unsigned int64 overflow for negative values
+                    if hval > 2**63:
+                        hval = hval - 2**64
+                    h = hval / (10 ** hdps) if hdps else float(hval)
+                    handicap_str = f" ({'+' if h > 0 else ''}{h:.1f})" if h != 0 else ""
                 bids = []
                 for bp in rp.back_prices:
                     odds = _decimal_to_float(bp.price)
@@ -208,7 +224,7 @@ class BTXAdapter(BaseMarketAdapter):
                 asks.sort(key=lambda x: x.price)
                 ltp = _decimal_to_float(rp.last_traded_price) if rp.HasField('last_traded_price') else None
                 ob = OrderBook(bids=bids, asks=asks, timestamp=datetime.now(timezone.utc))
-                display_name = names.get(rid, rid)
+                display_name = names.get(rid, rid) + handicap_str
                 events.append(MarketEvent(
                     market_id=f"{mid}:{rid}",
                     market_name=self.name,
