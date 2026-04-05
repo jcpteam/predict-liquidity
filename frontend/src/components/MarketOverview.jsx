@@ -207,12 +207,16 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
         </td>
         {PLATFORMS.map(p => {
           const st = platformStats[p]
+          const isOdds = ODDS_PLATFORMS.has(p)
           return (
             <td key={p} className="mkt-td-cell mkt-td-stats">
-              <Tip text={`Liquidity = sum of all order sizes (bids+asks) in ${p.toUpperCase()}`}>
-                <div className="mkt-stat-liq">{formatAmt(st.liq, p, showUSD)}</div>
+              <Tip text={`Liquidity = Σ(bid sizes + ask sizes) in ${p.toUpperCase()}${isOdds && p === 'betfair' ? '. GBP→USD: ×' + GBP_TO_USD : ''}`}>
+                <div className="mkt-stat-liq">
+                  {formatAmt(st.liq, p, showUSD)}
+                  {isOdds && !showUSD && <span className="mkt-cell-conv"> (${toUSD(st.liq, p).toFixed(0)} USD)</span>}
+                </div>
               </Tip>
-              <Tip text={`Spread = Σ best_bid(each outcome) in ${p.toUpperCase()}. ${ODDS_PLATFORMS.has(p) ? 'Shown as 1/Σ(1/odds)' : 'Fair = 100¢'}`}>
+              <Tip text={`Spread = Σ best_bid(each outcome).${isOdds ? ' Formula: Σ(1/odds)×100 = implied prob sum. ' : ' '}Fair market ≈ 100¢. >100¢ = overround.`}>
                 <div className="mkt-stat-spread">
                   {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
                 </div>
