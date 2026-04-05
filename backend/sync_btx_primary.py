@@ -139,34 +139,41 @@ def fetch_btx_ref_data():
         print(f"[btx] Step 1 (MATCH_ODDS): {len(base_data['fixtures'])}f {len(base_data['markets'])}m "
               f"{len(base_data['competitions'])}c {len(base_data['competitors'])}r")
 
-        # Step 2: Get all other market types (only markets, no fixtures needed)
+        # Step 2: Get other market types one by one (avoid timeout from huge payload)
         other_types = ["FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
                        "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
                        "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
                        "FOOTBALL_FULL_TIME_CORRECT_SCORE"]
-        req2 = betting_api_pb2.StreamMarketDataRequest(
-            market_types_to_stream=other_types,
-            stream_ref_data=True, stream_ref_data_after_timestamp=0,
-        )
-        stream2 = stub.StreamMarketData(req2, metadata=metadata, timeout=120)
-        extra_markets = 0
-        for msg in stream2:
-            if msg.ref_data and msg.ref_data.timestamp > 0:
-                rd = MessageToDict(msg.ref_data, preserving_proto_field_name=True)
-                new_mkts = rd.get("markets", [])
-                base_data["markets"].extend(new_mkts)
-                extra_markets += len(new_mkts)
-                # Also merge any new fixtures/competitors
-                base_data["fixtures"].extend(rd.get("fixtures", []))
-                base_data["competitors"].extend(rd.get("competitors", []))
-                base_data["competitions"].extend(rd.get("competitions", []))
-            if msg.update_type == 4:  # CAUGHT_UP
-                break
-            # Stop after getting a good amount of markets
-            if extra_markets > 4000:
-                break
-        stream2.cancel()
-        print(f"[btx] Step 2 (other types): +{extra_markets}m")
+        for otype in other_types:
+            try:
+                # New channel per request to avoid stale connections
+                ch2 = grpc.secure_channel("api.prod.ex3.io:443", grpc.ssl_channel_credentials(),
+                    options=[("grpc.max_receive_message_length", 50 * 1024 * 1024)])
+                st2 = betting_api_pb2_grpc.BettingApiStub(ch2)
+                req2 = betting_api_pb2.StreamMarketDataRequest(
+                    market_types_to_stream=[otype],
+                    stream_ref_data=True, stream_ref_data_after_timestamp=0,
+                )
+                stream2 = st2.StreamMarketData(req2, metadata=metadata, timeout=90)
+                extra = 0
+                for msg in stream2:
+                    if msg.ref_data and msg.ref_data.timestamp > 0:
+                        rd = MessageToDict(msg.ref_data, preserving_proto_field_name=True)
+                        new_mkts = rd.get("markets", [])
+                        base_data["markets"].extend(new_mkts)
+                        extra += len(new_mkts)
+                        base_data["fixtures"].extend(rd.get("fixtures", []))
+                        base_data["competitors"].extend(rd.get("competitors", []))
+                        if extra > 0:
+                            break  # Got the initial snapshot, move on
+                    if msg.update_type == 4:
+                        break
+                stream2.cancel()
+                ch2.close()
+                short = otype.replace("FOOTBALL_FULL_TIME_", "")
+                print(f"[btx] Step 2 ({short}): +{extra}m")
+            except Exception as e2:
+                print(f"[btx] Step 2 ({otype}) failed: {e2}")
 
         ref_data = base_data
         print(f"[btx] Final: {len(ref_data['fixtures'])}f {len(ref_data['markets'])}m "
@@ -309,6 +316,7 @@ def write_btx_to_db(ref_data):
         bf_mid = get_mapping_value(m.get("mappings", []), "Betfair", "MarketId")
         # Build runners with names from competitors
         runners = []
+        seen_pairs = set()
         for r in m.get("runners", []):
             rid = r.get("id", "")
             rname = competitor_map.get(rid, rid)
@@ -316,8 +324,21 @@ def write_btx_to_db(ref_data):
                 rname = "Draw"
             elif rid in ("OVER", "UNDER"):
                 rname = rid.title()
+            # For Asian Handicap / Goal Lines, runners repeat for each line
+            # Only keep unique runner IDs
+            if rid not in seen_pairs:
+                seen_pairs.add(rid)
+                runners.append({"id": rid, "name": rname})
+        # Count how many lines (pairs) this market has
+        total_runners = len(m.get("runners", []))
+        unique_runners = len(runners)
+        num_lines = total_runners // unique_runners if unique_runners > 0 else 0
+        # Append line count to display name for multi-line markets
+        dname_final = dname
+        if num_lines > 1:
+            dname_final = f"{dname} ({num_lines} lines)"
             runners.append({"id": rid, "name": rname})
-        btx_market_rows.append((fid, mid, mtype, dname, bf_mid or None,
+        btx_market_rows.append((fid, mid, mtype, dname_final, bf_mid or None,
                                 json.dumps(runners), now))
 
     for i in range(0, len(btx_market_rows), batch):
