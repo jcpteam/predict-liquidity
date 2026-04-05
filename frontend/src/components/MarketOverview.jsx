@@ -198,27 +198,30 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
           })}
         </tr>
       ))}
-      {/* Liquidity + Spread row */}
+      {/* Market-level Liquidity + Spread row */}
       <tr className="mkt-row mkt-row-stats">
         <td className="mkt-td-outcome mkt-td-stats-label">
-          <Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Spread = Σ(best bid) across outcomes; fair market ≈ 100¢.">
-            Liq / Spread ⓘ
+          <Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Spread = Σ(best bid probability) across outcomes; fair market ≈ 100¢.">
+            Liquidity / Spread ⓘ
           </Tip>
         </td>
         {PLATFORMS.map(p => {
           const st = platformStats[p]
           const isOdds = ODDS_PLATFORMS.has(p)
+          const isBf = p === 'betfair'
+          const rawLiq = st.liq
+          const usdLiq = toUSD(rawLiq, p)
           return (
             <td key={p} className="mkt-td-cell mkt-td-stats">
-              <Tip text={`Liquidity = Σ(bid sizes + ask sizes) in ${p.toUpperCase()}${isOdds && p === 'betfair' ? '. GBP→USD: ×' + GBP_TO_USD : ''}`}>
+              <Tip text={`Liquidity = Σ(all bid sizes + ask sizes) across all outcomes in ${p.toUpperCase()}.${isBf ? ' GBP→USD: amount × ' + GBP_TO_USD : ''}`}>
                 <div className="mkt-stat-liq">
-                  {formatAmt(st.liq, p, showUSD)}
-                  {isOdds && !showUSD && <span className="mkt-cell-conv"> (${toUSD(st.liq, p).toFixed(0)} USD)</span>}
+                  {formatAmt(rawLiq, p, false)}
+                  {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
                 </div>
               </Tip>
-              <Tip text={`Spread = Σ best_bid(each outcome).${isOdds ? ' Formula: Σ(1/odds)×100 = implied prob sum. ' : ' '}Fair market ≈ 100¢. >100¢ = overround.`}>
+              <Tip text={`Spread = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob = 1/odds, then Σ(prob)×100.' : ''} Fair market ≈ 100¢. >100¢ = overround (house edge).`}>
                 <div className="mkt-stat-spread">
-                  {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
+                  Spread: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
                 </div>
               </Tip>
             </td>
@@ -232,16 +235,37 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
 function Cell({ ev, platform, showUSD, onClick }) {
   const bid = getBestBid(ev)
   const ask = getBestAsk(ev)
-  const depth = getDepth(ev)
+  const isOdds = ODDS_PLATFORMS.has(platform)
+  const isBf = platform === 'betfair'
+
+  // Per-outcome liquidity = bid sizes + ask sizes
+  const bidDepth = ev?.order_book?.bids?.reduce((s, b) => s + b.size, 0) || 0
+  const askDepth = ev?.order_book?.asks?.reduce((s, a) => s + a.size, 0) || 0
+  const liq = bidDepth + askDepth
+  const usdLiq = toUSD(liq, platform)
+
+  // Per-outcome spread = ask - bid (in probability)
+  const spread = (bid != null && ask != null) ? ask - bid : null
+
   return (
     <td className="mkt-td-cell mkt-td-data" onClick={onClick} role="button" tabIndex={0}>
-      <Tip text={`Best Bid: highest price someone will buy at. ${ODDS_PLATFORMS.has(platform) ? 'Shown as decimal odds (e.g. 1.80 = 55.6% implied prob)' : 'Shown as probability in ¢'}`}>
+      <Tip text={`Best Bid: highest buy price.${isOdds ? ' Decimal odds (lower = more likely)' : ' Probability ¢ (higher = more likely)'}`}>
         <div className="mkt-cell-bid">Bid: {formatPrice(bid, platform)}</div>
       </Tip>
-      <Tip text={`Best Ask: lowest price someone will sell at. ${ODDS_PLATFORMS.has(platform) ? 'Decimal odds' : 'Probability ¢'}`}>
+      <Tip text={`Best Ask: lowest sell price.${isOdds ? ' Decimal odds' : ' Probability ¢'}`}>
         <div className="mkt-cell-ask">Ask: {formatPrice(ask, platform)}</div>
       </Tip>
-      <div className="mkt-cell-depth">{formatAmt(depth, platform, showUSD)}</div>
+      <Tip text={`Liquidity = Σ bid sizes + Σ ask sizes for this outcome.${isBf ? ' £' + liq.toFixed(0) + ' GBP × ' + GBP_TO_USD + ' = $' + usdLiq.toFixed(0) + ' USD' : ''}`}>
+        <div className="mkt-cell-liq-detail">
+          Liquidity: {formatAmt(liq, platform, false)}
+          {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)})</span>}
+        </div>
+      </Tip>
+      <Tip text={`Spread = Best Ask − Best Bid (as probability).${isOdds && bid && ask ? ' = (1/' + (1/ask).toFixed(2) + ') − (1/' + (1/bid).toFixed(2) + ')' : ''} Smaller = tighter market.`}>
+        <div className="mkt-cell-spread-detail">
+          Spread: {spread != null ? `${(Math.abs(spread) * 100).toFixed(1)}¢` : '—'}
+        </div>
+      </Tip>
     </td>
   )
 }

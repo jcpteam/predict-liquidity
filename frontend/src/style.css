@@ -610,3 +610,8 @@ button:hover { background: #2ea043; }
   pointer-events: none;
   line-height: 1.4;
 }
+
+/* ── Cell liquidity/spread detail ── */
+.mkt-cell-liq-detail { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.mkt-cell-spread-detail { font-size: 11px; color: #d29922; }
+.mkt-cell-conv { font-size: 10px; color: #58a6ff; }
