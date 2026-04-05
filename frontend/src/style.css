@@ -663,3 +663,5 @@ button:hover { background: #2ea043; }
 
 .spread-row td { color: #58a6ff; font-size: 12px; }
 .spread-row td:first-child { font-weight: 600; }
+
+.mkt-td-na { color: #30363d; font-style: italic; font-size: 11px; text-align: center; }

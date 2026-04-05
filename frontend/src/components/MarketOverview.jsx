@@ -216,6 +216,11 @@ function MarketRow({ btxMkt, otherMarkets, betfairEvents, onSelectMarket, showUS
           <td className="mkt-td-outcome">{displayLabel}</td>
           {PLATFORMS.map(p => {
             if (p === 'btx') return <Cell key={p} ev={btxEv} platform={p} showUSD={showUSD} onClick={() => onSelectMarket(btxMkt.market_type)} />
+            // For non-Match-Odds types, Polymarket/Kalshi don't have equivalent markets
+            const isMatchOdds = btxMkt.market_type === 'FOOTBALL_FULL_TIME_MATCH_ODDS'
+            if (!isMatchOdds && (p === 'polymarket' || p === 'kalshi')) {
+              return <td key={p} className="mkt-td-cell mkt-td-na" title={`${p} doesn't offer this market type`}>N/A</td>
+            }
             const evts = (p === 'betfair' && betfairEvents) ? betfairEvents : otherMarkets[p]
             const matched = findMatch(btxLabel, btxIsDraw, evts, p)
             if (!matched) return <td key={p} className="mkt-td-cell mkt-td-empty">—</td>

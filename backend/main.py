@@ -240,19 +240,39 @@ async def get_all_btx_markets(unified_id: str):
         if row.betfair_market_id:
             btx_to_betfair[row.btx_market_id] = row.betfair_market_id
 
-    # Fetch BTX real-time prices for the primary (Match Odds) market
+    # Fetch BTX real-time prices for ALL markets of this fixture
     btx_adapter = registry.get("btx")
     if btx_adapter and "btx" in mapping.mappings:
         try:
-            btx_primary_id = mapping.mappings["btx"]
-            btx_events = await btx_adapter.fetch_event(btx_primary_id)
-            if btx_events and btx_primary_id in btx_market_id_to_idx:
-                idx = btx_market_id_to_idx[btx_primary_id]
-                btx_market_groups[idx]["outcomes"] = [ev.model_dump(mode="json") for ev in btx_events]
-                btx_market_groups[idx]["liquidity"] = round(sum(
-                    sum(b.size for b in ev.order_book.bids) + sum(a.size for a in ev.order_book.asks)
-                    for ev in btx_events if ev.order_book
-                ), 2)
+            await btx_adapter._load_runner_names()
+            # Open one stream for all market types, get price snapshot
+            stream = await btx_adapter.stream_market_data(stream_prices=True)
+            if stream:
+                all_btx_ids = set(btx_market_id_to_idx.keys())
+                import time as _time
+                t0 = _time.time()
+                async for msg in stream:
+                    if _time.time() - t0 > 30:
+                        break
+                    if msg.prices and msg.prices.market_prices:
+                        parsed = btx_adapter.parse_price_message(msg.prices)
+                        for mid, events in parsed.items():
+                            if mid in all_btx_ids:
+                                idx = btx_market_id_to_idx[mid]
+                                has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
+                                if has_data:
+                                    btx_market_groups[idx]["outcomes"] = [ev.model_dump(mode="json") for ev in events]
+                                    btx_market_groups[idx]["liquidity"] = round(sum(
+                                        sum(b.size for b in ev.order_book.bids) + sum(a.size for a in ev.order_book.asks)
+                                        for ev in events if ev.order_book
+                                    ), 2)
+                                    all_btx_ids.discard(mid)
+                        # Got at least some data, break after first price message
+                        if len(all_btx_ids) < len(btx_market_id_to_idx):
+                            break
+                stream.cancel()
+                filled = len(btx_market_id_to_idx) - len(all_btx_ids)
+                print(f"[all-markets] BTX prices: {filled}/{len(btx_market_id_to_idx)} markets filled")
         except Exception as e:
             print(f"[all-markets] BTX price fetch error: {e}")
 
