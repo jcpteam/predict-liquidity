@@ -398,12 +398,15 @@ function LiquiditySummary({ columns }) {
     stats[mname] = { availLiq, availVol, matchedLiq: hasMatched ? matchedLiq : null, overround: bidCount > 0 ? bidSum : null }
   }
 
-  // Per-outcome best bids for spread
-  const outcomeBids = {}
+  // Per-outcome spread = best ask - best bid
+  const outcomeSpread = {}
   for (const col of columns) {
-    outcomeBids[col.outcome] = {}
+    outcomeSpread[col.outcome] = {}
     for (const mname of MARKET_ORDER) {
-      outcomeBids[col.outcome][mname] = getBestBid(col.markets[mname])
+      const ev = col.markets[mname]
+      const bid = getBestBid(ev)
+      const ask = getBestAsk(ev)
+      outcomeSpread[col.outcome][mname] = (bid != null && ask != null) ? ask - bid : null
     }
   }
 
@@ -414,7 +417,7 @@ function LiquiditySummary({ columns }) {
         <p>Available Liquidity = Σ(bid sizes + ask sizes)</p>
         <p>Available Volume = Σ(size × probability)</p>
         <p>Matched Liquidity / Volume = Traded amount from exchange</p>
-        <p>Spread per outcome = Best Bid probability</p>
+        <p>Spread per outcome = Best Ask − Best Bid</p>
         <p>Overround = Σ(best bids) — fair market = 100¢</p>
       </div>
       <table>
@@ -443,10 +446,10 @@ function LiquiditySummary({ columns }) {
           </tr>
           {columns.map(col => (
             <tr key={col.outcome} className="spread-row">
-              <td title={`Best Bid for ${col.outcome}`}>Spread: {col.outcome}</td>
+              <td title={`Spread = Best Ask − Best Bid for ${col.outcome}`}>Spread: {col.outcome}</td>
               {MARKET_ORDER.map(m => {
-                const bid = outcomeBids[col.outcome]?.[m]
-                return <td key={m}>{bid != null ? `${(bid * 100).toFixed(1)}¢` : '—'}</td>
+                const sp = outcomeSpread[col.outcome]?.[m]
+                return <td key={m}>{sp != null ? `${(sp * 100).toFixed(1)}¢` : '—'}</td>
               })}
             </tr>
           ))}
