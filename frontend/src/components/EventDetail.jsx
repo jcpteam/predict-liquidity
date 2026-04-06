@@ -398,20 +398,6 @@ function LiquiditySummary({ columns }) {
     stats[mname] = { availLiq, availVol, matchedLiq: hasMatched ? matchedLiq : null, overround: bidCount > 0 ? bidSum : null }
   }
 
-  // Per-outcome spread = lowest bid - highest ask (widest spread)
-  const outcomeSpread = {}
-  for (const col of columns) {
-    outcomeSpread[col.outcome] = {}
-    for (const mname of MARKET_ORDER) {
-      const ev = col.markets[mname]
-      const bids = ev?.order_book?.bids || []
-      const asks = ev?.order_book?.asks || []
-      const lowestBid = bids.length > 0 ? bids[bids.length - 1].price : null
-      const highestAsk = asks.length > 0 ? asks[asks.length - 1].price : null
-      outcomeSpread[col.outcome][mname] = (lowestBid != null && highestAsk != null) ? highestAsk - lowestBid : null
-    }
-  }
-
   return (
     <div className="liquidity-summary">
       <h3>Summary</h3>
@@ -419,8 +405,7 @@ function LiquiditySummary({ columns }) {
         <p>Available Liquidity = Σ(bid sizes + ask sizes)</p>
         <p>Available Volume = Σ(size × probability)</p>
         <p>Matched Liquidity / Volume = Traded amount from exchange</p>
-        <p>Spread per outcome = Highest Ask − Lowest Bid (widest price range)</p>
-        <p>Overround = Σ(best bids) — fair market = 100¢</p>
+        <p>Spread = Best Bid(Home) + Best Bid(Away) + Best Bid(Draw). Fair market = 100¢</p>
       </div>
       <table>
         <thead>
@@ -446,17 +431,8 @@ function LiquiditySummary({ columns }) {
             <td>Matched Volume</td>
             {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
           </tr>
-          {columns.map(col => (
-            <tr key={col.outcome} className="spread-row">
-              <td title={`Spread = Highest Ask − Lowest Bid for ${col.outcome}`}>Spread: {col.outcome}</td>
-              {MARKET_ORDER.map(m => {
-                const sp = outcomeSpread[col.outcome]?.[m]
-                return <td key={m}>{sp != null ? `${(sp * 100).toFixed(1)}¢` : '—'}</td>
-              })}
-            </tr>
-          ))}
           <tr className="overround-row">
-            <td title="Σ(best bid probability) — fair = 100¢">Overround (Total)</td>
+            <td title="Spread = Σ Best Bid(each outcome) = Best Bid(Home) + Best Bid(Away) + Best Bid(Draw). Fair market = 100¢">Spread</td>
             {MARKET_ORDER.map(m => <td key={m}>{stats[m].overround != null ? `${(stats[m].overround * 100).toFixed(1)}¢` : '—'}</td>)}
           </tr>
         </tbody>
