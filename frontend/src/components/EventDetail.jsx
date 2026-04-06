@@ -381,9 +381,11 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 }
 
 function LiquiditySummary({ columns }) {
+  const EXCHANGE_MARKETS = new Set(['btx', 'betfair'])
   const stats = {}
   for (const mname of MARKET_ORDER) {
     let availLiq = 0, availVol = 0, matchedLiq = 0, hasMatched = false, bidSum = 0, bidCount = 0
+    const isExchange = EXCHANGE_MARKETS.has(mname)
     for (const col of columns) {
       const ev = col.markets[mname]
       if (ev && ev.order_book) {
@@ -391,7 +393,13 @@ function LiquiditySummary({ columns }) {
         const asks = ev.order_book.asks || []
         availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
         availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
-        if (bids.length) { bidSum += bids[0].price; bidCount++ }
+        if (bids.length) {
+          // Exchange (BTX/Betfair): best back = last bid (lowest prob = highest odds)
+          // Prediction (PM/Kalshi): best bid = first bid (highest prob)
+          const bestBid = isExchange ? bids[bids.length - 1].price : bids[0].price
+          bidSum += bestBid
+          bidCount++
+        }
       }
       if (ev && ev.volume_24h != null) { matchedLiq += Number(ev.volume_24h); hasMatched = true }
     }

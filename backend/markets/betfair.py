@@ -378,7 +378,6 @@ class BetfairAdapter(BaseMarketAdapter):
             else:
                 asks = []
 
-            # 按价格排序: bids 降序, asks 升序
             bids.sort(key=lambda x: x.price, reverse=True)
             asks.sort(key=lambda x: x.price)
 
