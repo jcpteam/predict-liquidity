@@ -150,6 +150,12 @@ function getBestAsk(ev) {
   if (!ev || !ev.order_book || !ev.order_book.asks || !ev.order_book.asks.length) return null
   return Math.min(...ev.order_book.asks.map(a => a.price))
 }
+// For spread: use last_price if available (more accurate), else best bid
+function getSpreadPrice(ev) {
+  if (!ev) return null
+  if (ev.last_price != null && ev.last_price > 0 && ev.last_price < 1) return ev.last_price
+  return getBestBid(ev)
+}
 
 export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const [mapping, setMapping] = useState(null)
@@ -392,10 +398,9 @@ function LiquiditySummary({ columns }) {
         availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
         availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
         if (bids.length) {
-          // Best bid = highest price someone will pay (max of all bids)
-          const bestBid = Math.max(...bids.map(b => b.price))
-          bidSum += bestBid
-          bidCount++
+          // Use last_price for spread if available (avoids outlier bids)
+          const spreadPrice = getSpreadPrice(ev)
+          if (spreadPrice != null) { bidSum += spreadPrice; bidCount++ }
         }
       }
       if (ev && ev.volume_24h != null) { matchedLiq += Number(ev.volume_24h); hasMatched = true }
@@ -410,7 +415,7 @@ function LiquiditySummary({ columns }) {
         <p>Available Liquidity = Σ(bid sizes + ask sizes)</p>
         <p>Available Volume = Σ(size × probability)</p>
         <p>Matched Liquidity / Volume = Traded amount from exchange</p>
-        <p>Spread = Best Bid(Home) + Best Bid(Away) + Best Bid(Draw). Fair market = 100¢</p>
+        <p>Spread = Last Price(Home) + Last Price(Away) + Last Price(Draw). Fair market = 100¢</p>
       </div>
       <table>
         <thead>
@@ -437,7 +442,7 @@ function LiquiditySummary({ columns }) {
             {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
           </tr>
           <tr className="overround-row">
-            <td title="Spread = Σ Best Bid(each outcome) = Best Bid(Home) + Best Bid(Away) + Best Bid(Draw). Fair market = 100¢">Spread</td>
+            <td title="Spread = Σ Last Price (or Best Bid if no last price). Fair market = 100¢">Spread</td>
             {MARKET_ORDER.map(m => <td key={m}>{stats[m].overround != null ? `${(stats[m].overround * 100).toFixed(1)}¢` : '—'}</td>)}
           </tr>
         </tbody>
