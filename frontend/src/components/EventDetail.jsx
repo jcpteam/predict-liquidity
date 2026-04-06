@@ -141,14 +141,14 @@ function buildOutcomeColumns(marketsData) {
   })
 }
 
-// Get best bid price for an outcome event
+// Get best bid price (highest) for an outcome event
 function getBestBid(ev) {
   if (!ev || !ev.order_book || !ev.order_book.bids || !ev.order_book.bids.length) return null
-  return ev.order_book.bids[0].price
+  return Math.max(...ev.order_book.bids.map(b => b.price))
 }
 function getBestAsk(ev) {
   if (!ev || !ev.order_book || !ev.order_book.asks || !ev.order_book.asks.length) return null
-  return ev.order_book.asks[0].price
+  return Math.min(...ev.order_book.asks.map(a => a.price))
 }
 
 export default function EventDetail({ unifiedId, markets, onMappingChange }) {
@@ -381,11 +381,9 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 }
 
 function LiquiditySummary({ columns }) {
-  const EXCHANGE_MARKETS = new Set(['btx', 'betfair'])
   const stats = {}
   for (const mname of MARKET_ORDER) {
     let availLiq = 0, availVol = 0, matchedLiq = 0, hasMatched = false, bidSum = 0, bidCount = 0
-    const isExchange = EXCHANGE_MARKETS.has(mname)
     for (const col of columns) {
       const ev = col.markets[mname]
       if (ev && ev.order_book) {
@@ -394,9 +392,8 @@ function LiquiditySummary({ columns }) {
         availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
         availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
         if (bids.length) {
-          // Exchange (BTX/Betfair): best back = last bid (lowest prob = highest odds)
-          // Prediction (PM/Kalshi): best bid = first bid (highest prob)
-          const bestBid = isExchange ? bids[bids.length - 1].price : bids[0].price
+          // Best bid = highest price someone will pay (max of all bids)
+          const bestBid = Math.max(...bids.map(b => b.price))
           bidSum += bestBid
           bidCount++
         }
