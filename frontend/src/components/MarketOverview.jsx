@@ -97,20 +97,27 @@ function getTotalOutcomeCount(btxMarkets) {
  * 每个平台独立展示的“行情数量”。
  * - `btx`：所有 btx markets 的 outcomes.length 之和
  * - `polymarket` / `kalshi`：other_markets[平台].length
- * - `betfair`：betfair_per_btx 中所有映射数组的 length 之和
+ * - `betfair`：betfair_per_btx 中可用映射市场数量
  */
-function getPerPlatformQuoteCounts(btxMarkets, otherMarkets, betfairPerBtx) {
-  const bf = betfairPerBtx || {}
-  const betfairLines = Object.values(bf).reduce(
-    (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
-    0,
-  )
+function getVisibleBetfairMarketCount(btxMarkets, otherMarkets, betfairPerBtx) {
+  if (!Array.isArray(btxMarkets)) return 0
+  let count = 0
+  for (const btxMkt of btxMarkets) {
+    const betfairEvents = betfairPerBtx?.[btxMkt.market_id] || null
+    const rows = buildOutcomeRows(btxMkt.outcomes)
+    if (platformSubBlockHasContent('betfair', btxMkt, rows, otherMarkets, betfairEvents)) {
+      count += 1
+    }
+  }
+  return count
+}
 
+function getPerPlatformQuoteCounts(btxMarkets, otherMarkets, betfairPerBtx) {
   return {
     btx: getTotalOutcomeCount(btxMarkets),
     polymarket: Array.isArray(otherMarkets?.polymarket) ? otherMarkets.polymarket.length : 0,
     kalshi: Array.isArray(otherMarkets?.kalshi) ? otherMarkets.kalshi.length : 0,
-    betfair: betfairLines,
+    betfair: getVisibleBetfairMarketCount(btxMarkets, otherMarkets, betfairPerBtx),
   }
 }
 

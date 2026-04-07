@@ -7,7 +7,6 @@ export default function OrderBookChart({ orderBook, showOdds = false }) {
   const asks = [...(orderBook.asks || [])].sort((a, b) => b.price - a.price)
   const bestBid = bids.length ? bids[0].price : null
   const bestAsk = asks.length ? asks[asks.length - 1].price : null
-  const spread = bestAsk != null && bestBid != null ? (bestBid - bestAsk) * 100 : null
   const lastPrice = orderBook.last_price != null ? orderBook.last_price : null
 
   const formatPriceCents = (value, decimals = 1) => {
@@ -20,18 +19,6 @@ export default function OrderBookChart({ orderBook, showOdds = false }) {
       return price > 0 ? (1 / price).toFixed(2) : '—'
     }
     return formatPriceCents(price * 100, 1)
-  }
-
-  const formatSpread = () => {
-    if (showOdds && bestBid != null && bestAsk != null) {
-      const bidOdds = bestBid > 0 ? 1 / bestBid : null
-      const askOdds = bestAsk > 0 ? 1 / bestAsk : null
-      if (bidOdds != null && askOdds != null) {
-        return (askOdds - bidOdds).toFixed(2)
-      }
-      return '—'
-    }
-    return formatPriceCents(spread, 1)
   }
 
   const formatNumber = (num, decimals = 2) => {
@@ -62,11 +49,6 @@ export default function OrderBookChart({ orderBook, showOdds = false }) {
             <span className="ob-total">{formatTotal(a)}</span>
           </div>
         )) : <div className="ob-empty">No asks</div>}
-      </div>
-
-      <div className="ob-metrics">
-        {lastPrice != null && <span className="ob-meta">Last: {formatPrice(lastPrice)}</span>}
-        {spread != null && <span className="ob-meta">Spread: {formatSpread()}</span>}
       </div>
 
       <div className="ob-section ob-bids">
