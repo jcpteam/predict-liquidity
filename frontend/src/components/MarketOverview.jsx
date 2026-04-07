@@ -99,14 +99,16 @@ function getTotalOutcomeCount(btxMarkets) {
  * - `polymarket` / `kalshi`：other_markets[平台].length
  * - `betfair`：betfair_per_btx 中可用映射市场数量
  */
-function getVisibleBetfairMarketCount(btxMarkets, otherMarkets, betfairPerBtx) {
+function getVisibleBetfairOutcomeCount(btxMarkets, otherMarkets, betfairPerBtx) {
   if (!Array.isArray(btxMarkets)) return 0
   let count = 0
   for (const btxMkt of btxMarkets) {
-    const betfairEvents = betfairPerBtx?.[btxMkt.market_id] || null
+    const betfairEvents = betfairPerBtx?.[btxMkt.market_id] || []
     const rows = buildOutcomeRows(btxMkt.outcomes)
-    if (platformSubBlockHasContent('betfair', btxMkt, rows, otherMarkets, betfairEvents)) {
-      count += 1
+    for (const { btxLabel, btxIsDraw } of rows) {
+      if (findMatch(btxLabel, btxIsDraw, betfairEvents, 'betfair')) {
+        count += 1
+      }
     }
   }
   return count
@@ -117,7 +119,7 @@ function getPerPlatformQuoteCounts(btxMarkets, otherMarkets, betfairPerBtx) {
     btx: getTotalOutcomeCount(btxMarkets),
     polymarket: Array.isArray(otherMarkets?.polymarket) ? otherMarkets.polymarket.length : 0,
     kalshi: Array.isArray(otherMarkets?.kalshi) ? otherMarkets.kalshi.length : 0,
-    betfair: getVisibleBetfairMarketCount(btxMarkets, otherMarkets, betfairPerBtx),
+    betfair: getVisibleBetfairOutcomeCount(btxMarkets, otherMarkets, betfairPerBtx),
   }
 }
 

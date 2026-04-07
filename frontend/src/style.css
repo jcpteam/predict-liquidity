@@ -267,6 +267,9 @@ code {
   color: #8b949e;
   border-bottom: 1px solid #30363d;
 }
+.ob-table-header span:nth-child(1) { justify-self: start; }
+.ob-table-header span:nth-child(2) { justify-self: end; }
+.ob-table-header span:nth-child(3) { justify-self: end; }
 .ob-section {
   display: flex;
   flex-direction: column;
