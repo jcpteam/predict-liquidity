@@ -168,6 +168,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [manualId, setManualId] = useState('')
+  const [showOdds, setShowOdds] = useState(false)
   const matchAttemptedRef = useRef(false)
   const wsRef = useRef(null)
   const reconnectTimer = useRef(null)
@@ -303,6 +304,9 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
           {lastUpdate && <span className="timestamp">Updated: {lastUpdate.toLocaleTimeString()}</span>}
           {autoMatching && <span className="auto-match-status">🔄 Auto-matching...</span>}
         </div>
+        <button className="btn-toggle-odds" onClick={() => setShowOdds(!showOdds)}>
+          {showOdds ? 'Show Probabilities' : 'Show Odds'}
+        </button>
       </div>
 
       {/* Linked markets */}
@@ -354,29 +358,30 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
       {columns.length > 0 && (
         <div className="outcome-columns">
           {columns.map(col => (
-            <div key={col.outcome} className="outcome-col">
-              <div className="outcome-col-header">{col.outcome}</div>
-              {MARKET_ORDER.map(mname => {
-                const ev = col.markets[mname]
-                return (
-                  <div key={mname} className="outcome-market-cell">
-                    <div className="cell-market-label">{mname.toUpperCase()}</div>
-                    {!ev || !ev.order_book ? (
-                      <div className="cell-nodata">No Data</div>
-                    ) : (
-                      <div className="cell-ob">
-                        <div className="cell-meta">
-                          {ev.last_price != null && <span className="price">{(ev.last_price * 100).toFixed(1)}¢</span>}
-                          {getBestBid(ev) != null && <span className="cell-bid">Bid: {(getBestBid(ev) * 100).toFixed(1)}¢</span>}
-                          {getBestAsk(ev) != null && <span className="cell-ask">Ask: {(getBestAsk(ev) * 100).toFixed(1)}¢</span>}
-                        </div>
-                        <OrderBookChart orderBook={ev.order_book} />
+            <div key={col.outcome} className="outcome-col-header">{col.outcome}</div>
+          ))}
+
+          {MARKET_ORDER.map(mname => (
+            columns.map(col => {
+              const ev = col.markets[mname]
+              return (
+                <div key={`${col.outcome}-${mname}`} className="outcome-market-cell">
+                  <div className="cell-market-label">{mname.toUpperCase()}</div>
+                  {!ev || !ev.order_book ? (
+                    <div className="cell-nodata">No Data</div>
+                  ) : (
+                    <div className="cell-ob">
+                      <div className="cell-meta">
+                        {ev.last_price != null && <span className="price">{showOdds ? (ev.last_price > 0 ? (1 / ev.last_price).toFixed(2) : '—') : (ev.last_price * 100).toFixed(1) + '¢'}</span>}
+                        {getBestBid(ev) != null && <span className="cell-bid">Bid: {showOdds ? (getBestBid(ev) > 0 ? (1 / getBestBid(ev)).toFixed(2) : '—') : (getBestBid(ev) * 100).toFixed(1) + '¢'}</span>}
+                        {getBestAsk(ev) != null && <span className="cell-ask">Ask: {showOdds ? (getBestAsk(ev) > 0 ? (1 / getBestAsk(ev)).toFixed(2) : '—') : (getBestAsk(ev) * 100).toFixed(1) + '¢'}</span>}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                        <OrderBookChart orderBook={ev.order_book} showOdds={showOdds} />
+                    </div>
+                  )}
+                </div>
+              )
+            })
           ))}
         </div>
       )}
