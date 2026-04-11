@@ -226,12 +226,12 @@ function OutcomeCellDiv({ ev, platform, onClick }) {
     <div className="mkt-outcome-cell mkt-td-data" onClick={onClick} role="button" tabIndex={0}>
       <Tip text={isOdds ? `Best Bid (decimal odds). Lower odds = higher probability. prob = 1/odds` : `Best Bid (probability ¢)`}>
         <div className="mkt-cell-bid">
-          Bid: {isOdds ? (bidOdds || '—') : (bid != null ? `${(bid * 100).toFixed(1)}¢` : '—')}
+          Bid: {isOdds ? (bidOdds ? `${bidOdds} (${(bid * 100).toFixed(1)}¢)` : '—') : (bid != null ? `${(bid * 100).toFixed(1)}¢` : '—')}
         </div>
       </Tip>
       <Tip text={isOdds ? `Best Ask (decimal odds). prob = 1/odds` : `Best Ask (probability ¢)`}>
         <div className="mkt-cell-ask">
-          Ask: {isOdds ? (askOdds || '—') : (ask != null ? `${(ask * 100).toFixed(1)}¢` : '—')}
+          Ask: {isOdds ? (askOdds ? `${askOdds} (${(ask * 100).toFixed(1)}¢)` : '—') : (ask != null ? `${(ask * 100).toFixed(1)}¢` : '—')}
         </div>
       </Tip>
       <Tip text={`Liquidity = Σ(bid sizes) + Σ(ask sizes).${isBf ? ` £${liq.toFixed(0)} × ${GBP_TO_USD} = $${usdLiq.toFixed(0)}` : ''}`}>
