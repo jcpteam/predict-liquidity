@@ -288,9 +288,12 @@ async def get_all_btx_markets(unified_id: str):
             continue
         if mname == "betfair":
             if betfair_adapter:
-                for btx_mid, bf_mid in btx_to_betfair.items():
+                # Only fetch Betfair for Match Odds market (others too slow)
+                match_odds_btx = mapping.mappings.get("btx", "")
+                bf_mid = btx_to_betfair.get(match_odds_btx)
+                if bf_mid:
                     tasks.append(betfair_adapter.fetch_event(bf_mid))
-                    task_names.append(("betfair_per", btx_mid))
+                    task_names.append(("betfair_per", match_odds_btx))
             continue
         adapter = registry.get(mname)
         if adapter:
@@ -302,10 +305,14 @@ async def get_all_btx_markets(unified_id: str):
         if isinstance(data, Exception):
             if kind == "other":
                 other_markets[key] = [{"error": str(data)}]
+            print(f"[all-markets] {kind}/{key} error: {data}")
         else:
             evts = [ev.model_dump(mode="json") for ev in data]
             if kind == "betfair_per":
                 betfair_per_btx[key] = evts
+                # Also put in other_markets for fallback
+                if "betfair" not in other_markets:
+                    other_markets["betfair"] = evts
             else:
                 other_markets[key] = evts
 
