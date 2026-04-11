@@ -533,10 +533,10 @@ function PlatformHeaderRow({ counts, showUSD }) {
             <span className="mkt-platform-name">{p.toUpperCase()}</span>
             <span className="mkt-platform-count">: {counts[p]}</span>
           </div>
-          <span className="mkt-th-currency mkt-platform-sub">
-            {showUSD ? 'USD' : PLATFORM_CURRENCY[p].code}
-            {ODDS_PLATFORMS.has(p) ? ' (ODDS)' : ' (PROB)'}
-          </span>
+          {/*<span className="mkt-th-currency mkt-platform-sub">*/}
+          {/*  {showUSD ? 'USD' : PLATFORM_CURRENCY[p].code}*/}
+          {/*  {ODDS_PLATFORMS.has(p) ? ' (ODDS)' : ' (PROB)'}*/}
+          {/*</span>*/}
         </div>
       ))}
     </div>
