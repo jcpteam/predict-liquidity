@@ -467,7 +467,7 @@ function LiquiditySummary({ columns }) {
           </tr>
           <tr>
             <td>Matched Liquidity</td>
-            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
+            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? (m === 'betfair' ? `£${stats[m].matchedLiq.toFixed(0)} ($${(stats[m].matchedLiq*1.27).toFixed(0)})` : `$${stats[m].matchedLiq.toFixed(0)}`) : '—'}</td>)}
           </tr>
           <tr>
             <td title="Spread = Σ Last Price (or Best Bid if no last price). Fair market = 100¢">Spread</td>
@@ -475,6 +475,13 @@ function LiquiditySummary({ columns }) {
           </tr>
         </tbody>
       </table>
+      <div className="liq-formulas" style={{marginTop: 8}}>
+        <p><strong>BTX / Betfair Raw ↔ Predict Format:</strong></p>
+        <p>Raw → Predict: probability = 1 / decimal_odds × 100 (¢)</p>
+        <p>Predict → Raw: decimal_odds = 1 / (probability / 100)</p>
+        <p>Example: odds 2.50 → 1/2.50 = 0.40 = 40.0¢ | 40.0¢ → 1/0.40 = 2.50</p>
+        <p>Betfair currency: £1 GBP = $1.27 USD</p>
+      </div>
     </div>
   )
 }

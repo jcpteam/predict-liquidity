@@ -305,7 +305,9 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
 
       subBlocks.push(
         <div key={btxMkt.market_id} className="mkt-col-subcard">
-          <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)}>
+          <button type="button" className="mkt-col-subtitle"
+            onClick={btxMkt.market_type === 'FOOTBALL_FULL_TIME_MATCH_ODDS' ? () => onSelectMarket(btxMkt.market_type, btxMkt.market_id) : undefined}
+            style={btxMkt.market_type !== 'FOOTBALL_FULL_TIME_MATCH_ODDS' ? {cursor: 'default'} : {}}>
             {marketLabel}
           </button>
           {rows.map(({ btxEv, btxLabel, btxIsDraw, displayLabel, idx }) => {
@@ -410,7 +412,7 @@ function PolymarketColumn({ otherMarkets, onSelectMarket }) {
 
             return (
               <div key={midx} className="mkt-col-subcard">
-                <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}>
+                <button type="button" className="mkt-col-subtitle" style={{cursor: 'default'}}>
                   {market.display_name || market.market_type_display || group.market_type_display}
                   {market.line != null && <span className="market-line"> (line: {market.line})</span>}
                 </button>
@@ -497,8 +499,7 @@ function KalshiColumn({ otherMarkets, onSelectMarket }) {
           <div key={idx} className="mkt-col-cat">
             <div className="mkt-col-cat-title">{marketTypeDisplay}</div>
             <div className="mkt-col-subcard">
-              <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket('kalshi')}>
-                {market.display_name || marketTypeDisplay}
+              <button type="button" className="mkt-col-subtitle" style={{cursor: 'default'}}>                {market.display_name || marketTypeDisplay}
               </button>
               {marketOutcomes.map((ev, evIdx) => (
                 <div key={evIdx} className="mkt-col-outcome-line">
