@@ -993,6 +993,55 @@ button:hover { background: #2ea043; }
   background: #0d1117;
 }
 
+/* Polymarket Tabs */
+.pm-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.pm-tab {
+  padding: 6px 12px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #161b22;
+  color: #8b949e;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pm-tab:hover {
+  background: #21262d;
+  color: #c9d1d9;
+}
+
+.pm-tab.active {
+  background: #238636;
+  border-color: #2ea043;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.pm-tab-count {
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.pm-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.market-line {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #8b949e;
+  font-weight: normal;
+}
+
 .mkt-col-cat {
   background: #161b22;
   border: 1px solid #30363d;
@@ -1040,9 +1089,9 @@ button:hover { background: #2ea043; }
 .mkt-col-outcome-line:last-of-type { margin-bottom: 10px; }
 
 .mkt-col-outcome-lbl {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #c9d1d9;
+  color: #e1e4e8;
   padding-top: 4px;
   word-break: break-word;
 }
@@ -1068,6 +1117,27 @@ button:hover { background: #2ea043; }
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.mkt-outcome-event-group {
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  background: #10131a;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.mkt-outcome-event-group:last-child {
+  margin-bottom: 0;
+}
+
+.mkt-outcome-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #58a6ff;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #21262d;
 }
 
 .mkt-col-substats {

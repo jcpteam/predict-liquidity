@@ -65,10 +65,26 @@ function getDepth(ev) {
          (ev.order_book.asks || []).reduce((s, a) => s + a.size, 0)
 }
 function getBestBid(ev) {
-  return ev?.order_book?.bids?.[0]?.price ?? null
+  const bids = ev?.order_book?.bids || []
+  let best = null
+  for (const bid of bids) {
+    const price = bid?.price
+    if (typeof price === 'number' && !Number.isNaN(price)) {
+      best = best == null ? price : Math.max(best, price)
+    }
+  }
+  return best
 }
 function getBestAsk(ev) {
-  return ev?.order_book?.asks?.[0]?.price ?? null
+  const asks = ev?.order_book?.asks || []
+  let best = null
+  for (const ask of asks) {
+    const price = ask?.price
+    if (typeof price === 'number' && !Number.isNaN(price)) {
+      best = best == null ? price : Math.min(best, price)
+    }
+  }
+  return best
 }
 
 function Tip({ text, children }) {
@@ -96,7 +112,8 @@ function getTotalOutcomeCount(btxMarkets) {
 /**
  * 每个平台独立展示的“行情数量”。
  * - `btx`：所有 btx markets 的 outcomes.length 之和
- * - `polymarket` / `kalshi`：other_markets[平台].length
+ * - `polymarket`：BTX outcomes matched by Polymarket
+ * - `kalshi`：other_markets[kalshi].length
  * - `betfair`：betfair_per_btx 中可用映射市场数量
  */
 function getVisibleBetfairOutcomeCount(btxMarkets, otherMarkets, betfairPerBtx) {
@@ -114,11 +131,36 @@ function getVisibleBetfairOutcomeCount(btxMarkets, otherMarkets, betfairPerBtx) 
   return count
 }
 
+function getVisiblePolymarketOutcomeCount(btxMarkets, otherMarkets) {
+  const pmMarkets = otherMarkets?.polymarket_markets || []
+  if (!pmMarkets.length) return 0
+
+  if (Array.isArray(pmMarkets[0]?.markets)) {
+    return pmMarkets.reduce((sum, group) => {
+      if (!Array.isArray(group.markets)) return sum
+      return sum + group.markets.reduce((marketSum, market) => marketSum + (Array.isArray(market.outcomes) ? market.outcomes.length : 0), 0)
+    }, 0)
+  }
+
+  return pmMarkets.reduce((sum, market) => sum + (Array.isArray(market.outcomes) ? market.outcomes.length : 0), 0)
+}
+
+function getVisibleKalshiOutcomeCount(otherMarkets) {
+  const kalshiMarkets = otherMarkets?.kalshi_markets || otherMarkets?.kalshi || []
+  if (!Array.isArray(kalshiMarkets) || !kalshiMarkets.length) return 0
+
+  if (Array.isArray(kalshiMarkets[0]?.outcomes)) {
+    return kalshiMarkets.reduce((sum, market) => sum + (Array.isArray(market.outcomes) ? market.outcomes.length : 0), 0)
+  }
+
+  return kalshiMarkets.length
+}
+
 function getPerPlatformQuoteCounts(btxMarkets, otherMarkets, betfairPerBtx) {
   return {
     btx: getTotalOutcomeCount(btxMarkets),
-    polymarket: Array.isArray(otherMarkets?.polymarket) ? otherMarkets.polymarket.length : 0,
-    kalshi: Array.isArray(otherMarkets?.kalshi) ? otherMarkets.kalshi.length : 0,
+    polymarket: getVisiblePolymarketOutcomeCount(btxMarkets, otherMarkets),
+    kalshi: getVisibleKalshiOutcomeCount(otherMarkets),
     betfair: getVisibleBetfairOutcomeCount(btxMarkets, otherMarkets, betfairPerBtx),
   }
 }
@@ -135,6 +177,7 @@ function computePlatformMarketStats(btxMkt, platform, otherMarkets, betfairEvent
   const outcomes = btxMkt.outcomes || []
   let evts
   if (platform === 'btx') evts = outcomes
+  else if (platform === 'polymarket') evts = outcomes
   else if (platform === 'betfair' && betfairEvents) evts = betfairEvents
   else evts = otherMarkets[platform]
   if (!evts || !Array.isArray(evts)) return { liq: 0, spread: null }
@@ -239,15 +282,19 @@ function MarketPlatformStatsDiv({ btxMkt, platform, otherMarkets, betfairEvents 
 }
 
 function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSelectMarket }) {
+  if (platform === 'polymarket') {
+    return <PolymarketColumn otherMarkets={otherMarkets} onSelectMarket={onSelectMarket} />
+  }
+  if (platform === 'kalshi') {
+    return <KalshiColumn otherMarkets={otherMarkets} onSelectMarket={onSelectMarket} />
+  }
+
   const blocks = []
   for (const [typeKey, group] of Object.entries(grouped)) {
     const subBlocks = []
     for (const btxMkt of group.markets) {
       const betfairEvents = betfairPerBtx[btxMkt.market_id] || null
       const isMatchOdds = btxMkt.market_type === 'FOOTBALL_FULL_TIME_MATCH_ODDS'
-      if (platform !== 'btx' && (platform === 'polymarket' || platform === 'kalshi') && !isMatchOdds) {
-        continue
-      }
 
       const marketLabel = btxMkt.display_name || btxMkt.market_type_display
       const rows = buildOutcomeRows(btxMkt.outcomes)
@@ -269,9 +316,6 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
             } else {
               const evts = platform === 'betfair' ? betfairEvents : otherMarkets[platform]
               ev = findMatch(btxLabel, btxIsDraw, evts, platform)
-              if (!ev && (platform === 'polymarket' || platform === 'kalshi') && !isMatchOdds) {
-                emptyKind = 'na'
-              }
             }
 
             return (
@@ -308,6 +352,174 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
       {blocks.length === 0 ? (
         <div className="mkt-column-empty">No markets</div>
       ) : blocks}
+    </div>
+  )
+}
+
+function groupPolymarketOutcomes(outcomes, marketTypeDisplay) {
+  const items = Array.isArray(outcomes) ? outcomes : []
+  if (marketTypeDisplay !== 'More Markets') {
+    return [{ title: null, outcomes: items }]
+  }
+
+  const groups = new Map()
+  for (const ev of items) {
+    const title = ev.event_title || ''
+    if (!groups.has(title)) groups.set(title, [])
+    groups.get(title).push(ev)
+  }
+
+  const result = []
+  for (const [title, outcomesForTitle] of groups) {
+    if (title && outcomesForTitle.length > 1) {
+      result.push({ title, outcomes: outcomesForTitle })
+    } else {
+      for (const ev of outcomesForTitle) {
+        result.push({ title: null, outcomes: [ev] })
+      }
+    }
+  }
+  return result
+}
+
+function PolymarketColumn({ otherMarkets, onSelectMarket }) {
+  const pmMarkets = otherMarkets?.polymarket_markets || []
+
+  const sortedGroups = useMemo(() => {
+    return [...pmMarkets].sort((a, b) => {
+      if (a.market_type_display === 'Match Odds') return -1
+      if (b.market_type_display === 'Match Odds') return 1
+      return a.market_type_display.localeCompare(b.market_type_display)
+    })
+  }, [pmMarkets])
+
+  if (!sortedGroups.length) {
+    return <div className="mkt-column"><div className="mkt-column-empty">No Polymarket markets</div></div>
+  }
+
+  const isGroupWithMarkets = Array.isArray(sortedGroups[0]?.markets)
+
+  return (
+    <div className="mkt-column">
+      {sortedGroups.map((group, idx) => (
+        <div key={idx} className="mkt-col-cat">
+          <div className="mkt-col-cat-title">{group.market_type_display}</div>
+          {(isGroupWithMarkets ? group.markets : [group]).map((market, midx) => {
+            const marketTypeDisplay = market.market_type_display || group.market_type_display
+            const outcomeGroups = groupPolymarketOutcomes(market.outcomes, marketTypeDisplay)
+
+            return (
+              <div key={midx} className="mkt-col-subcard">
+                <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(market.market_type || group.market_type)}>
+                  {market.display_name || market.market_type_display || group.market_type_display}
+                  {market.line != null && <span className="market-line"> (line: {market.line})</span>}
+                </button>
+                {outcomeGroups.map((groupItem, groupIdx) => {
+                  const groupContent = groupItem.outcomes.map((ev, evIdx) => {
+                    const outcome = (ev.outcome || '').trim()
+                    const eventTitle = ev.event_title || ''
+                    const strippedExactScore = marketTypeDisplay === 'Exact Score'
+                      ? eventTitle.replace(/^Exact Score:\s*/i, '')
+                      : eventTitle
+                    const label = marketTypeDisplay === 'More Markets'
+                      ? (/^(yes|no)$/i.test(outcome) && eventTitle
+                        ? `${eventTitle} (${outcome})`
+                        : outcome || eventTitle || '')
+                      : (strippedExactScore || outcome || '')
+
+                    return (
+                      <div key={evIdx} className="mkt-col-outcome-line">
+                        <span className="mkt-col-outcome-lbl">{label}</span>
+                        <OutcomeCellDiv
+                          ev={ev}
+                          platform="polymarket"
+                          onClick={() => onSelectMarket(market.market_type || group.market_type)}
+                        />
+                      </div>
+                    )
+                  })
+
+                  if (groupItem.title) {
+                    return (
+                      <div key={`group-${groupIdx}`} className="mkt-outcome-event-group">
+                        <div className="mkt-outcome-group-title">{groupItem.title}</div>
+                        {groupContent}
+                      </div>
+                    )
+                  }
+
+                  return <React.Fragment key={`group-${groupIdx}`}>{groupContent}</React.Fragment>
+                })}
+                <MarketPlatformStatsDiv
+                  btxMkt={{ outcomes: market.outcomes || [], liquidity: market.liquidity || 0 }}
+                  platform="polymarket"
+                  otherMarkets={otherMarkets}
+                  betfairEvents={null}
+                />
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function KalshiColumn({ otherMarkets, onSelectMarket }) {
+  let kalshiMarkets = otherMarkets?.kalshi_markets || otherMarkets?.kalshi || []
+
+  if (!Array.isArray(kalshiMarkets)) {
+    kalshiMarkets = []
+  }
+
+  // If the backend returns raw outcome list under kalshi, wrap it into a Match Odds market.
+  if (kalshiMarkets.length && !Array.isArray(kalshiMarkets[0]?.outcomes)) {
+    kalshiMarkets = [{
+      market_type: 'FOOTBALL_FULL_TIME_MATCH_ODDS',
+      market_type_display: 'Match Odds',
+      display_name: 'Match Odds',
+      outcomes: kalshiMarkets,
+      liquidity: 0,
+    }]
+  }
+
+  if (!kalshiMarkets.length) {
+    return <div className="mkt-column"><div className="mkt-column-empty">No Kalshi markets</div></div>
+  }
+
+  return (
+    <div className="mkt-column">
+      {kalshiMarkets.map((market, idx) => {
+        const marketTypeDisplay = market.market_type_display || market.display_name || 'Match Odds'
+        const marketOutcomes = Array.isArray(market.outcomes) ? market.outcomes : []
+
+        return (
+          <div key={idx} className="mkt-col-cat">
+            <div className="mkt-col-cat-title">{marketTypeDisplay}</div>
+            <div className="mkt-col-subcard">
+              <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket('kalshi')}>
+                {market.display_name || marketTypeDisplay}
+              </button>
+              {marketOutcomes.map((ev, evIdx) => (
+                <div key={evIdx} className="mkt-col-outcome-line">
+                  <span className="mkt-col-outcome-lbl">{ev.outcome || ''}</span>
+                  <OutcomeCellDiv
+                    ev={ev}
+                    platform="kalshi"
+                    onClick={() => onSelectMarket('kalshi')}
+                  />
+                </div>
+              ))}
+              <MarketPlatformStatsDiv
+                btxMkt={{ outcomes: marketOutcomes, liquidity: market.liquidity || 0 }}
+                platform="kalshi"
+                otherMarkets={otherMarkets}
+                betfairEvents={null}
+              />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

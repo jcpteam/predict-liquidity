@@ -18,6 +18,7 @@ class OrderBook(BaseModel):
 
 class MarketEvent(BaseModel):
     market_id: str
+    token_id: Optional[str] = None
     market_name: str
     event_title: str
     outcome: str

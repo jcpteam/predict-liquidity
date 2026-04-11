@@ -169,7 +169,7 @@ class KalshiAdapter(BaseMarketAdapter):
                 for b in data.get("yes_dollars") or data.get("yes") or []
             ]
             asks = [
-                OrderLevel(price=float(a[0]), size=float(a[1]))
+                OrderLevel(price=1-float(a[0]), size=float(a[1]))
                 for a in data.get("no_dollars") or data.get("no") or []
             ]
             # yes_dollars 按价格降序排列 (最高出价在前)

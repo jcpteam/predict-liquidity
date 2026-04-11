@@ -200,6 +200,13 @@ async def get_all_btx_markets(unified_id: str):
     if "btx" not in mapping.mappings:
         return await get_event_orderbooks(unified_id)
 
+    if "kalshi" in mapping.mappings:
+        kalshi_id = mapping.mappings.get("kalshi", "")
+        if kalshi_id and "KXEPLGAME" not in kalshi_id:
+              # 将 KXEPL1H 替换为 KXEPLGAME
+           corrected_id = kalshi_id.replace("KXEPL1H", "KXEPLGAME")
+           mapping.mappings["kalshi"] = corrected_id
+
     # Read BTX markets from DB
     from database import async_session, DBBtxMarket
     from sqlalchemy import select
@@ -314,6 +321,146 @@ async def get_all_btx_markets(unified_id: str):
             else:
                 other_markets[key] = evts
 
+    if "kalshi" in mapping.mappings:
+        kalsh_markets = []
+        kalsh_markets.append({
+            "market_type": "FOOTBALL_FULL_TIME_MATCH_ODDS",
+            "market_type_display": "Match Odds",
+            "display_name": "Match Odds",
+            "outcomes": other_markets["kalshi"],
+            "liquidity": 0,
+        })
+        other_markets["kalshi_markets"] = kalsh_markets
+
+    # Fetch Polymarket child events and group by market_type (like BTX)
+    if "polymarket" in mapping.mappings:
+        pm_event_id = mapping.mappings["polymarket"]
+        pm_adapter = registry.get("polymarket")
+        if pm_adapter:
+            try:
+                from database import async_session, DBEvent
+                from sqlalchemy import select
+
+                # Query child events where parent_eventid = pm_event_id
+                async with async_session() as session:
+                    child_rows = (await session.execute(
+                        select(DBEvent).where(DBEvent.parent_eventid == int(pm_event_id))
+                    )).scalars().all()
+
+                # Group child events by market_type (extracted from display_name after ' - ')
+                # Structure: {market_type: {conditionId: {line, groupItemTitle, outcomes: []}}}
+                pm_market_groups = {}  # market_type -> {conditionId: market_info}
+                pm_market_liquidity = {}  # market_type -> liquidity
+
+                if child_rows:
+                    # Fetch orderbook for each child event
+                    child_tasks = []
+                    child_display_names = []
+                    child_pm_data_list = []
+                    for child in child_rows:
+                        child_tasks.append(pm_adapter.fetch_event(child.unified_id))
+                        # Extract market type from display_name
+                        display_name = child.display_name or ""
+                        if " - " in display_name:
+                            market_type = display_name.split(" - ")[-1].strip()
+                        else:
+                            market_type = "Unknown"
+                        child_display_names.append(market_type)
+                        pm_market_liquidity[market_type] = child.liquidity
+                        child_pm_data_list.append(child.polymarket_data_json)
+
+                    if child_tasks:
+                        child_fetched = await asyncio.gather(*child_tasks, return_exceptions=True)
+                        for market_type, child_data, pm_json_str in zip(child_display_names, child_fetched, child_pm_data_list):
+                            if isinstance(child_data, Exception):
+                                print(f"[all-markets] Failed to fetch child: {child_data}")
+                                continue
+
+                            # Parse polymarket_data_json to build market mapping
+                            token_to_market = {}
+                            if pm_json_str:
+                                try:
+                                    import json as _json
+                                    pm_json_data = _json.loads(pm_json_str)
+                                    for mkt in pm_json_data.get("markets", []):
+                                        condition_id = mkt.get("conditionId", "")
+                                        line = mkt.get("line")
+                                        group_item_title = mkt.get("groupItemTitle", "")
+                                        clob_token_ids = mkt.get("clobTokenIds", "[]")
+                                        if isinstance(clob_token_ids, str):
+                                            clob_token_ids = _json.loads(clob_token_ids)
+                                        for tid in clob_token_ids:
+                                            token_to_market[tid] = {
+                                                "condition_id": condition_id,
+                                                "line": line,
+                                                "group_item_title": group_item_title,
+                                            }
+                                except Exception as e:
+                                    print(f"[all-markets] Failed to parse pm_data: {e}")
+
+                            # Initialize market_type in pm_market_groups
+                            if market_type not in pm_market_groups:
+                                pm_market_groups[market_type] = {}
+
+                            # Group outcomes by conditionId
+                            for ev in child_data:
+                                ev_dict = ev.model_dump(mode="json")
+                                token_id = ev_dict.get("token_id", "")
+                                if token_id in token_to_market:
+                                    mkt_info = token_to_market[token_id]
+                                    cond_id = mkt_info["condition_id"]
+                                    if cond_id not in pm_market_groups[market_type]:
+                                        pm_market_groups[market_type][cond_id] = {
+                                            "line": mkt_info["line"],
+                                            "group_item_title": mkt_info["group_item_title"],
+                                            "outcomes": []
+                                        }
+                                    pm_market_groups[market_type][cond_id]["outcomes"].append(ev_dict)
+
+                # Reorganize polymarket data to match BTX format
+                # Build polymarket_markets list: group by market_type, display_name = market_type
+                # Each item: {market_type, market_type_display, display_name, outcomes, liquidity}
+                polymarket_markets = []
+                for market_type, markets_by_cond in pm_market_groups.items():
+                    if not markets_by_cond:
+                        continue
+                    # Get liquidity for this market_type
+                    liquidity = pm_market_liquidity.get(market_type, "0") or "0"
+                    liquidity_val = float(liquidity) if liquidity.replace(".", "").replace("-", "").isdigit() else 0
+                    btx_type = _map_pm_type_to_btx(market_type)
+
+                    # Merge all outcomes from all conditionIds into one entry per market_type
+                    all_outcomes = []
+                    for cond_id, info in markets_by_cond.items():
+                        all_outcomes.extend(info.get("outcomes", []))
+
+                    polymarket_markets.append({
+                        "market_type": btx_type,
+                        "market_type_display": market_type,
+                        "display_name": market_type,
+                        "outcomes": all_outcomes,
+                        "liquidity": liquidity_val,
+                    })
+
+                # Add Match Odds from other_markets["polymarket"] if not already in pm_market_groups
+                if "Match Odds" not in pm_market_groups and "polymarket" in other_markets:
+                    if isinstance(other_markets["polymarket"], list) and other_markets["polymarket"]:
+                        polymarket_markets.insert(0, {
+                            "market_type": "FOOTBALL_FULL_TIME_MATCH_ODDS",
+                            "market_type_display": "Match Odds",
+                            "display_name": "Match Odds",
+                            "outcomes": other_markets["polymarket"],
+                            "liquidity": 0,
+                        })
+
+                # Replace other_markets["polymarket"] with grouped structure
+                other_markets["polymarket_markets"] = polymarket_markets
+                print(f"[all-markets] Polymarket grouped into {len(polymarket_markets)} market types")
+            except Exception as e:
+                print(f"[all-markets] Failed to fetch Polymarket child events: {e}")
+                import traceback; traceback.print_exc()
+
+
     types_count = {}
     for g in btx_market_groups:
         t = g.get("market_type", "?")
@@ -328,6 +475,23 @@ async def get_all_btx_markets(unified_id: str):
         "other_markets": other_markets,
         "betfair_per_btx": betfair_per_btx,
     }
+
+
+# ── Polymarket 类型映射 ──
+
+def _map_pm_type_to_btx(pm_type: str) -> str:
+    """Map Polymarket display type to BTX market type format"""
+    type_mapping = {
+        "Match Odds": "FOOTBALL_FULL_TIME_MATCH_ODDS",
+        "Correct Score": "FOOTBALL_FULL_TIME_CORRECT_SCORE",
+        "Over/Under": "FOOTBALL_FULL_TIME_TOTAL_GOALS_OVER_UNDER",
+        "Asian Handicap": "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
+        "First Half Match Odds": "FOOTBALL_FIRST_HALF_MATCH_ODDS",
+        "Player Props": "PLAYER_PROPS",
+        "Corners": "CORNERS",
+        "Cards": "CARDS",
+    }
+    return type_mapping.get(pm_type, pm_type.upper().replace(" ", "_").replace("/", "_"))
 
 
 # ── 清理已结束事件 ──
@@ -789,4 +953,4 @@ for candidate in [
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

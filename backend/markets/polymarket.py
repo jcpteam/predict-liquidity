@@ -93,6 +93,7 @@ class PolymarketAdapter(BaseMarketAdapter):
                 prices_raw = m.get("outcomePrices", "[]")
                 prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
                 question = m.get("question", m.get("groupItemTitle", ""))
+                market_id = m.get("conditionId")
                 vol = m.get("volume24hr")
 
                 for idx, token_id in enumerate(token_ids):
@@ -103,7 +104,7 @@ class PolymarketAdapter(BaseMarketAdapter):
                     last_price = float(prices[idx]) if idx < len(prices) else None
                     group_title = m.get("groupItemTitle", "")
                     display_title = group_title if group_title else question
-                    token_meta.append((token_id, outcome_label, last_price, display_title, vol))
+                    token_meta.append((token_id, outcome_label, last_price, display_title, vol, market_id))
 
             # 批量获取 order book（POST /books，每批最多 50 个）
             ob_map: dict[str, OrderBook | None] = {}
@@ -111,6 +112,7 @@ class PolymarketAdapter(BaseMarketAdapter):
             for i in range(0, len(token_meta), batch_size):
                 batch = token_meta[i:i + batch_size]
                 batch_ids = [t[0] for t in batch]
+                batch_market_ids = [t[5]+t[0] for t in batch]
                 try:
                     book_resp = await self.client.post(
                         f"{self.BASE_URL}/books",
@@ -119,8 +121,27 @@ class PolymarketAdapter(BaseMarketAdapter):
                     )
                     book_resp.raise_for_status()
                     books = book_resp.json()
-                    for idx_b, book_data in enumerate(books):
-                        tid = batch_ids[idx_b]
+
+                    response_map: dict[str, dict] = {}
+                    if isinstance(books, dict):
+                        for tid, book_data in books.items():
+                            response_map[str(tid)] = book_data
+                    elif isinstance(books, list):
+                        for idx_b, book_data in enumerate(books):
+                            if isinstance(book_data, dict) and "market" in book_data:
+                                tid = f"{book_data['market']}{book_data['asset_id']}"
+                            elif idx_b < len(batch_ids):
+                                tid = batch_ids[idx_b]
+                            else:
+                                continue
+                            response_map[tid] = book_data
+
+                    for tid in batch_market_ids:
+                        book_data = response_map.get(tid)
+                        if not isinstance(book_data, dict):
+                            ob_map.setdefault(tid, None)
+                            continue
+
                         bids = [OrderLevel(price=float(b["price"]), size=float(b["size"])) for b in book_data.get("bids", [])]
                         asks = [OrderLevel(price=float(a["price"]), size=float(a["size"])) for a in book_data.get("asks", [])]
                         ob_map[tid] = OrderBook(bids=bids, asks=asks, timestamp=datetime.now(timezone.utc))
@@ -130,13 +151,15 @@ class PolymarketAdapter(BaseMarketAdapter):
                         ob_map.setdefault(tid, None)
 
             results = []
-            for token_id, outcome_label, last_price, display_title, vol in token_meta:
+            for token_id, outcome_label, last_price, display_title, vol, market_id in token_meta:
                 results.append(MarketEvent(
-                    market_id=token_id,
+                    market_id=market_id,
+                    token_id=token_id,
+                 #   id=f"{market_id}{token_id}",
                     market_name=self.name,
                     event_title=display_title,
                     outcome=outcome_label,
-                    order_book=ob_map.get(token_id),
+                    order_book=ob_map.get(f"{market_id}{token_id}"),
                     last_price=last_price,
                     volume_24h=vol,
                 ))

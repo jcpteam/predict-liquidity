@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import quote as _url_quote
 
 from sqlalchemy import (
-    Column, String, Text, DateTime, Boolean, Integer,
+    Column, String, Text, DateTime, Boolean, Integer, BigInteger,
     UniqueConstraint, create_engine, text,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
@@ -89,6 +89,7 @@ class DBEvent(Base):
     volume_24hr = Column(String(50), nullable=True)
     market_count = Column(Integer, default=0)
     tags_json = Column(Text, nullable=True)  # JSON array of tag strings
+    parent_eventid = Column(BigInteger, nullable=True)  # Polymarket parent event ID
     polymarket_data_json = Column(LONGTEXT, nullable=True)  # full polymarket event JSON
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
