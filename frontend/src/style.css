@@ -272,7 +272,7 @@ code {
 .ob-table-header span:nth-child(3) { justify-self: end; }
 .scroll-box {
 
-  height: 300px;   /* 必须给高度 */
+  max-height: 300px;   /* 必须给高度 */
   overflow-y: auto; /* 垂直滚动 */
   overflow-x: hidden;
   border: 0px solid #ccc;
