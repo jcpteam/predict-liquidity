@@ -291,7 +291,7 @@ async def get_all_btx_markets(unified_id: str):
                 import time as _time
                 t0 = _time.time()
                 async for msg in stream:
-                    if _time.time() - t0 > 5:
+                    if _time.time() - t0 > 10:
                         break
                     if msg.prices and msg.prices.market_prices:
                         parsed = btx_adapter.parse_price_message(msg.prices)
@@ -307,8 +307,9 @@ async def get_all_btx_markets(unified_id: str):
                                     ), 2)
                                     all_btx_ids.discard(mid)
                         # Got at least some data, break after first price message
-                        # if len(all_btx_ids) < len(btx_market_id_to_idx):
-                        #     break
+                        # if len(all_btx_ids) == len(btx_market_id_to_idx):
+                        if len(all_btx_ids) == 0:
+                            break
                 stream.cancel()
                 filled = len(btx_market_id_to_idx) - len(all_btx_ids)
                 print(f"[all-markets] BTX prices: {filled}/{len(btx_market_id_to_idx)} markets filled")
