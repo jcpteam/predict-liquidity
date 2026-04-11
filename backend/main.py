@@ -288,6 +288,7 @@ async def get_all_btx_markets(unified_id: str):
             continue
         if mname == "betfair":
             if betfair_adapter:
+                # Fetch all Betfair markets in parallel
                 for btx_mid, bf_mid in btx_to_betfair.items():
                     tasks.append(betfair_adapter.fetch_event(bf_mid))
                     task_names.append(("betfair_per", btx_mid))
@@ -302,10 +303,14 @@ async def get_all_btx_markets(unified_id: str):
         if isinstance(data, Exception):
             if kind == "other":
                 other_markets[key] = [{"error": str(data)}]
+            print(f"[all-markets] {kind}/{key} error: {data}")
         else:
             evts = [ev.model_dump(mode="json") for ev in data]
             if kind == "betfair_per":
                 betfair_per_btx[key] = evts
+                # Also put in other_markets for fallback
+                if "betfair" not in other_markets:
+                    other_markets["betfair"] = evts
             else:
                 other_markets[key] = evts
 
