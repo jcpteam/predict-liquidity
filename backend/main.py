@@ -288,12 +288,10 @@ async def get_all_btx_markets(unified_id: str):
             continue
         if mname == "betfair":
             if betfair_adapter:
-                # Only fetch Betfair for Match Odds market (others too slow)
-                match_odds_btx = mapping.mappings.get("btx", "")
-                bf_mid = btx_to_betfair.get(match_odds_btx)
-                if bf_mid:
+                # Fetch all Betfair markets in parallel
+                for btx_mid, bf_mid in btx_to_betfair.items():
                     tasks.append(betfair_adapter.fetch_event(bf_mid))
-                    task_names.append(("betfair_per", match_odds_btx))
+                    task_names.append(("betfair_per", btx_mid))
             continue
         adapter = registry.get(mname)
         if adapter:
