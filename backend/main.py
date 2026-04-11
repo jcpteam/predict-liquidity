@@ -291,7 +291,7 @@ async def get_all_btx_markets(unified_id: str):
                 import time as _time
                 t0 = _time.time()
                 async for msg in stream:
-                    if _time.time() - t0 > 3:
+                    if _time.time() - t0 > 5:
                         break
                     if msg.prices and msg.prices.market_prices:
                         parsed = btx_adapter.parse_price_message(msg.prices)
