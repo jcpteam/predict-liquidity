@@ -168,15 +168,28 @@ async def get_event_orderbooks(unified_id: str, btx_market_id: str = None):
     tasks = []
     market_names = []
 
+    # Determine if this is a non-Match-Odds market
+    is_match_odds = True
+    if btx_market_id:
+        from database import async_session as _as0, DBBtxMarket
+        from sqlalchemy import select as _sel0
+        async with _as0() as session:
+            mtype = (await session.execute(
+                _sel0(DBBtxMarket.market_type).where(DBBtxMarket.btx_market_id == btx_market_id)
+            )).scalar()
+        if mtype and mtype != "FOOTBALL_FULL_TIME_MATCH_ODDS":
+            is_match_odds = False
+
     for mname, meid in mapping.mappings.items():
         adapter = registry.get(mname)
         if not adapter:
             continue
+        # Polymarket/Kalshi only have Match Odds — skip for other market types
+        if not is_match_odds and mname in ("polymarket", "kalshi"):
+            continue
         if mname == "btx" and btx_market_id:
-            # Use specific BTX market ID instead of default
             tasks.append(adapter.fetch_event(btx_market_id))
         elif mname == "betfair" and btx_market_id:
-            # Look up corresponding Betfair market ID from DB
             from database import async_session as _as, DBBtxMarket
             from sqlalchemy import select as _sel
             async with _as() as session:
@@ -618,23 +631,38 @@ async def _fetch_all_orderbooks(mapping, btx_market_id=None) -> dict:
     results = {}
     tasks = []
     market_names = []
+
+    # Check if non-Match-Odds
+    is_match_odds = True
+    if btx_market_id:
+        from database import async_session as _as3, DBBtxMarket
+        from sqlalchemy import select as _sel3
+        async with _as3() as session:
+            mtype = (await session.execute(
+                _sel3(DBBtxMarket.market_type).where(DBBtxMarket.btx_market_id == btx_market_id)
+            )).scalar()
+        if mtype and mtype != "FOOTBALL_FULL_TIME_MATCH_ODDS":
+            is_match_odds = False
+
     for mname, meid in mapping.mappings.items():
         adapter = registry.get(mname)
-        if adapter:
-            if mname == "btx" and btx_market_id:
-                tasks.append(adapter.fetch_event(btx_market_id))
-            elif mname == "betfair" and btx_market_id:
-                # Look up Betfair market ID for this specific BTX market
-                from database import async_session as _as2, DBBtxMarket
-                from sqlalchemy import select as _sel2
-                async with _as2() as session:
-                    bf_id = (await session.execute(
-                        _sel2(DBBtxMarket.betfair_market_id).where(DBBtxMarket.btx_market_id == btx_market_id)
-                    )).scalar()
-                tasks.append(adapter.fetch_event(bf_id or meid))
-            else:
-                tasks.append(adapter.fetch_event(meid))
-            market_names.append(mname)
+        if not adapter:
+            continue
+        if not is_match_odds and mname in ("polymarket", "kalshi"):
+            continue
+        if mname == "btx" and btx_market_id:
+            tasks.append(adapter.fetch_event(btx_market_id))
+        elif mname == "betfair" and btx_market_id:
+            from database import async_session as _as2, DBBtxMarket
+            from sqlalchemy import select as _sel2
+            async with _as2() as session:
+                bf_id = (await session.execute(
+                    _sel2(DBBtxMarket.betfair_market_id).where(DBBtxMarket.btx_market_id == btx_market_id)
+                )).scalar()
+            tasks.append(adapter.fetch_event(bf_id or meid))
+        else:
+            tasks.append(adapter.fetch_event(meid))
+        market_names.append(mname)
 
     fetched = await asyncio.gather(*tasks, return_exceptions=True)
     for mname, data in zip(market_names, fetched):
