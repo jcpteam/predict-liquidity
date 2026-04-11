@@ -581,12 +581,12 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
         <div className="detail-title-meta">
           {data.event_time && <span className="detail-time">🕐 {new Date(data.event_time).toLocaleString()}</span>}
           {data.event_time && isLive(data.event_time) && <span className="live-dot">● LIVE</span>}
-          <Tip text="Total quotes = sum of all outcomes across all market labels (e.g. Match Odds 3 + Total Goals 4 = 7).">
-            <span className="mkt-all-markets-total">All markets: {totalAllMarkets}</span>
-          </Tip>
-          <button type="button" className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>
-            {showUSD ? '$ All USD' : '🔄 Convert to USD'}
-          </button>
+          {/*<Tip text="Total quotes = sum of all outcomes across all market labels (e.g. Match Odds 3 + Total Goals 4 = 7).">*/}
+          {/*  <span className="mkt-all-markets-total">All markets: {totalAllMarkets}</span>*/}
+          {/*</Tip>*/}
+          {/*<button type="button" className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>*/}
+          {/*  {showUSD ? '$ All USD' : '🔄 Convert to USD'}*/}
+          {/*</button>*/}
         </div>
       </div>
 
