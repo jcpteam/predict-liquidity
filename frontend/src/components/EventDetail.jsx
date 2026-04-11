@@ -159,7 +159,7 @@ function getSpreadPrice(ev) {
 
 
 
-export default function EventDetail({ unifiedId, markets, onMappingChange }) {
+export default function EventDetail({ unifiedId, markets, btxMarketId, onMappingChange }) {
   const [mapping, setMapping] = useState(null)
   const [orderBookData, setOrderBookData] = useState(null)
   const [wsConnected, setWsConnected] = useState(false)
@@ -184,6 +184,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
   const connectWs = useCallback((uid) => {
     closeWs()
     const ws = createOrderBookSocket(uid, {
+      btxMarketId: btxMarketId,
       onSnapshot: (data) => {
         setOrderBookData({ unified_id: data.unified_id, display_name: data.display_name, markets: data.markets })
         setLastUpdate(new Date())

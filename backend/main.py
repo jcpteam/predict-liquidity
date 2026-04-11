@@ -159,7 +159,7 @@ async def auto_match_all():
 # ── Order Book (按需加载, 进入详情页时调用) ──
 
 @app.get("/api/events/{unified_id}/orderbooks")
-async def get_event_orderbooks(unified_id: str):
+async def get_event_orderbooks(unified_id: str, btx_market_id: str = None):
     mapping = await mapping_store.get_mapping(unified_id)
     if not mapping:
         raise HTTPException(404, "Event not found")
@@ -167,11 +167,29 @@ async def get_event_orderbooks(unified_id: str):
     results: dict[str, list[dict]] = {}
     tasks = []
     market_names = []
+
     for mname, meid in mapping.mappings.items():
         adapter = registry.get(mname)
-        if adapter:
+        if not adapter:
+            continue
+        if mname == "btx" and btx_market_id:
+            # Use specific BTX market ID instead of default
+            tasks.append(adapter.fetch_event(btx_market_id))
+        elif mname == "betfair" and btx_market_id:
+            # Look up corresponding Betfair market ID from DB
+            from database import async_session as _as, DBBtxMarket
+            from sqlalchemy import select as _sel
+            async with _as() as session:
+                row = (await session.execute(
+                    _sel(DBBtxMarket.betfair_market_id).where(DBBtxMarket.btx_market_id == btx_market_id)
+                )).scalar()
+            if row:
+                tasks.append(adapter.fetch_event(row))
+            else:
+                tasks.append(adapter.fetch_event(meid))
+        else:
             tasks.append(adapter.fetch_event(meid))
-            market_names.append(mname)
+        market_names.append(mname)
 
     fetched = await asyncio.gather(*tasks, return_exceptions=True)
     for mname, data in zip(market_names, fetched):
@@ -184,6 +202,7 @@ async def get_event_orderbooks(unified_id: str):
         "unified_id": mapping.unified_id,
         "display_name": mapping.display_name,
         "event_time": mapping.event_time,
+        "btx_market_id": btx_market_id,
         "markets": results,
     }
 
@@ -505,7 +524,7 @@ async def cleanup_events():
 # ── WebSocket 实时 Order Book ──
 
 @app.websocket("/ws/orderbooks/{unified_id}")
-async def ws_orderbooks(websocket: WebSocket, unified_id: str):
+async def ws_orderbooks(websocket: WebSocket, unified_id: str, btx_market_id: str = None):
     """WebSocket 实时推送 orderbook 数据
     1. 连接后立即发送初始 orderbook 快照
     2. Polymarket: 通过 WebSocket 订阅实时更新
@@ -521,7 +540,7 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
 
     # 发送初始快照
     try:
-        initial = await _fetch_all_orderbooks(mapping)
+        initial = await _fetch_all_orderbooks(mapping, btx_market_id)
         await websocket.send_json({
             "type": "snapshot",
             "unified_id": unified_id,
@@ -570,7 +589,7 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
             except Exception:
                 pass
             tasks.append(asyncio.create_task(
-                _btx_grpc_stream(websocket, mapping, btx_adapter, stop_event)
+                _btx_grpc_stream(websocket, mapping, btx_adapter, stop_event, btx_market_id)
             ))
 
     # 监听客户端断开
@@ -594,7 +613,7 @@ async def ws_orderbooks(websocket: WebSocket, unified_id: str):
                 pass
 
 
-async def _fetch_all_orderbooks(mapping) -> dict:
+async def _fetch_all_orderbooks(mapping, btx_market_id=None) -> dict:
     """获取所有市场的 orderbook（REST 方式）"""
     results = {}
     tasks = []
@@ -602,7 +621,19 @@ async def _fetch_all_orderbooks(mapping) -> dict:
     for mname, meid in mapping.mappings.items():
         adapter = registry.get(mname)
         if adapter:
-            tasks.append(adapter.fetch_event(meid))
+            if mname == "btx" and btx_market_id:
+                tasks.append(adapter.fetch_event(btx_market_id))
+            elif mname == "betfair" and btx_market_id:
+                # Look up Betfair market ID for this specific BTX market
+                from database import async_session as _as2, DBBtxMarket
+                from sqlalchemy import select as _sel2
+                async with _as2() as session:
+                    bf_id = (await session.execute(
+                        _sel2(DBBtxMarket.betfair_market_id).where(DBBtxMarket.btx_market_id == btx_market_id)
+                    )).scalar()
+                tasks.append(adapter.fetch_event(bf_id or meid))
+            else:
+                tasks.append(adapter.fetch_event(meid))
             market_names.append(mname)
 
     fetched = await asyncio.gather(*tasks, return_exceptions=True)
@@ -893,11 +924,9 @@ async def _betfair_poll_stream(websocket: WebSocket, mapping, betfair_adapter, s
             await asyncio.sleep(10)
 
 
-async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_event):
-    """BTX gRPC StreamMarketData 实时推送 orderbook 数据
-    BTX 流推送所有足球市场的价格，我们过滤目标 market_id
-    """
-    btx_market_id = mapping.mappings.get("btx", "")
+async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_event, override_market_id=None):
+    """BTX gRPC StreamMarketData 实时推送 orderbook 数据"""
+    btx_market_id = override_market_id or mapping.mappings.get("btx", "")
     if not btx_market_id:
         return
 

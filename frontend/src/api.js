@@ -41,8 +41,9 @@ export async function searchMarketEvents(marketName, query) {
   return res.json()
 }
 
-export async function fetchOrderBooks(unifiedId) {
-  const res = await fetch(`${BASE}/events/${unifiedId}/orderbooks`)
+export async function fetchOrderBooks(unifiedId, btxMarketId) {
+  const params = btxMarketId ? `?btx_market_id=${encodeURIComponent(btxMarketId)}` : ''
+  const res = await fetch(`${BASE}/events/${unifiedId}/orderbooks${params}`)
   return res.json()
 }
 
@@ -61,9 +62,11 @@ export async function autoMatchAll() {
   return res.json()
 }
 
-export function createOrderBookSocket(unifiedId, { onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onBetfairUpdate, onBtxUpdate, onError, onOpen, onClose }) {
+export function createOrderBookSocket(unifiedId, { btxMarketId, onSnapshot, onBookUpdate, onPriceChange, onTrade, onKalshiUpdate, onBetfairUpdate, onBtxUpdate, onError, onOpen, onClose }) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const ws = new WebSocket(`${proto}://${window.location.host}/ws/orderbooks/${unifiedId}`)
+  let url = `${proto}://${window.location.host}/ws/orderbooks/${unifiedId}`
+  if (btxMarketId) url += `?btx_market_id=${encodeURIComponent(btxMarketId)}`
+  const ws = new WebSocket(url)
 
   ws.onopen = () => {
     if (onOpen) onOpen()

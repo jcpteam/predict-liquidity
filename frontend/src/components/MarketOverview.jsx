@@ -305,7 +305,7 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
 
       subBlocks.push(
         <div key={btxMkt.market_id} className="mkt-col-subcard">
-          <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(btxMkt.market_type)}>
+          <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)}>
             {marketLabel}
           </button>
           {rows.map(({ btxEv, btxLabel, btxIsDraw, displayLabel, idx }) => {
@@ -323,7 +323,7 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
                 <span className="mkt-col-outcome-lbl">{displayLabel}</span>
                 {ev ? (
                   <OutcomeCellDiv ev={ev} platform={platform}
-                    onClick={() => onSelectMarket(btxMkt.market_type)} />
+                    onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)} />
                 ) : (
                   <div className={`mkt-col-outcome-empty mkt-td-${emptyKind}`}>
                     {emptyKind === 'na' ? 'N/A' : '—'}
@@ -410,7 +410,7 @@ function PolymarketColumn({ otherMarkets, onSelectMarket }) {
 
             return (
               <div key={midx} className="mkt-col-subcard">
-                <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(market.market_type || group.market_type)}>
+                <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}>
                   {market.display_name || market.market_type_display || group.market_type_display}
                   {market.line != null && <span className="market-line"> (line: {market.line})</span>}
                 </button>
@@ -433,7 +433,7 @@ function PolymarketColumn({ otherMarkets, onSelectMarket }) {
                         <OutcomeCellDiv
                           ev={ev}
                           platform="polymarket"
-                          onClick={() => onSelectMarket(market.market_type || group.market_type)}
+                          onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}
                         />
                       </div>
                     )

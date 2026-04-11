@@ -22,6 +22,7 @@ export default function App() {
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [selectedEventName, setSelectedEventName] = useState('')
   const [selectedMarketLabel, setSelectedMarketLabel] = useState(null)
+  const [selectedBtxMarketId, setSelectedBtxMarketId] = useState(null)
 
   const loadLeagues = async () => {
     setLoading(true)
@@ -64,9 +65,10 @@ export default function App() {
     setView('markets')
   }
 
-  // Markets page → Detail page (specific market/outcome)
-  const handleSelectMarket = (marketLabel) => {
+  // Markets page → Detail page (specific btx market)
+  const handleSelectMarket = (marketLabel, btxMarketId) => {
     setSelectedMarketLabel(marketLabel)
+    setSelectedBtxMarketId(btxMarketId || null)
     setView('detail')
   }
 
@@ -121,6 +123,7 @@ export default function App() {
           <EventDetail
             unifiedId={selectedEventId}
             markets={markets}
+            btxMarketId={selectedBtxMarketId}
             onMappingChange={() => { if (selectedLeague) loadEventsForLeague(selectedLeague) }}
           />
         </div>
