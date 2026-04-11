@@ -371,11 +371,7 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
                     <div className="cell-nodata">No Data</div>
                   ) : (
                     <div className="cell-ob">
-                      <div className="cell-meta">
-                        {ev.last_price != null && <span className="price">{showOdds ? (ev.last_price > 0 ? (1 / ev.last_price).toFixed(2) : '—') : (ev.last_price * 100).toFixed(1) + '¢'}</span>}
-                        {getBestBid(ev) != null && <span className="cell-bid">Bid: {showOdds ? (getBestBid(ev) > 0 ? (1 / getBestBid(ev)).toFixed(2) : '—') : (getBestBid(ev) * 100).toFixed(1) + '¢'}</span>}
-                        {getBestAsk(ev) != null && <span className="cell-ask">Ask: {showOdds ? (getBestAsk(ev) > 0 ? (1 / getBestAsk(ev)).toFixed(2) : '—') : (getBestAsk(ev) * 100).toFixed(1) + '¢'}</span>}
-                      </div>
+                        <ShowSubHeader ev={ev} showOdds={showOdds} />
                         <OrderBookChart orderBook={ev.order_book} showOdds={showOdds} />
                     </div>
                   )}
@@ -388,6 +384,17 @@ export default function EventDetail({ unifiedId, markets, onMappingChange }) {
 
       {columns.length > 0 && <LiquiditySummary columns={columns} />}
     </div>
+  )
+}
+
+function ShowSubHeader ({ev,showOdds}){
+
+  return (
+      <div className="cell-meta">
+        {ev.last_price != null && <span className="price">{showOdds ? (ev.last_price > 0 ? (1 / ev.last_price).toFixed(2) : '—') : (ev.last_price * 100).toFixed(1) + '¢'}</span>}
+        {getBestBid(ev) != null && <span className="cell-bid">Bid: {showOdds ? (getBestBid(ev) > 0 ? (1 / getBestBid(ev)).toFixed(2) : '—') : (getBestBid(ev) * 100).toFixed(1) + '¢'}</span>}
+        {getBestAsk(ev) != null && <span className="cell-ask">Ask: {showOdds ? (getBestAsk(ev) > 0 ? (1 / getBestAsk(ev)).toFixed(2) : '—') : (getBestAsk(ev) * 100).toFixed(1) + '¢'}</span>}
+      </div>
   )
 }
 

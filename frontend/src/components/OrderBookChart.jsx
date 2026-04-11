@@ -41,7 +41,7 @@ export default function OrderBookChart({ orderBook, showOdds = false }) {
         <span>TOTAL</span>
       </div>
 
-      <div className="ob-section ob-asks">
+      <div className="scroll-box ob-section ob-asks">
         {asks.length > 0 ? asks.map((a, i) => (
           <div key={i} className="ob-row ask-row">
             <span className="ob-price">{formatPrice(a.price)}</span>
@@ -51,7 +51,7 @@ export default function OrderBookChart({ orderBook, showOdds = false }) {
         )) : <div className="ob-empty">No asks</div>}
       </div>
 
-      <div className="ob-section ob-bids">
+      <div className="scroll-box ob-section ob-bids">
         {bids.length > 0 ? bids.map((b, i) => (
           <div key={i} className="ob-row bid-row">
             <span className="ob-price">{formatPrice(b.price)}</span>
