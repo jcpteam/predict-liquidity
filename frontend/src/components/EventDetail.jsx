@@ -315,7 +315,7 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
           {autoMatching && <span className="auto-match-status">🔄 Auto-matching...</span>}
         </div>
         <button className="btn-toggle-odds" onClick={() => setShowOdds(!showOdds)}>
-          {showOdds ? 'Show Probabilities' : 'Show Odds'}
+          {showOdds ? 'Show Predict Format' : 'Show Raw Data'}
         </button>
       </div>
 
@@ -398,12 +398,22 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
 }
 
 function ShowSubHeader ({ev,showOdds}){
+  // showOdds=false → predict format (probability ¢)
+  // showOdds=true → raw format (platform native: odds for BTX/Betfair, ¢ for PM/Kalshi)
+  const mname = ev.market_name || ''
+  const isExchange = mname === 'btx' || mname === 'betfair'
+
+  const fmtPrice = (p) => {
+    if (p == null) return '—'
+    if (showOdds && isExchange && p > 0) return (1 / p).toFixed(2)
+    return (p * 100).toFixed(1) + '¢'
+  }
 
   return (
       <div className="cell-meta">
-        {ev.last_price != null && <span className="price">{showOdds ? (ev.last_price > 0 ? (1 / ev.last_price).toFixed(2) : '—') : (ev.last_price * 100).toFixed(1) + '¢'}</span>}
-        {getBestBid(ev) != null && <span className="cell-bid">Bid: {showOdds ? (getBestBid(ev) > 0 ? (1 / getBestBid(ev)).toFixed(2) : '—') : (getBestBid(ev) * 100).toFixed(1) + '¢'}</span>}
-        {getBestAsk(ev) != null && <span className="cell-ask">Ask: {showOdds ? (getBestAsk(ev) > 0 ? (1 / getBestAsk(ev)).toFixed(2) : '—') : (getBestAsk(ev) * 100).toFixed(1) + '¢'}</span>}
+        {ev.last_price != null && <span className="price">{fmtPrice(ev.last_price)}</span>}
+        {getBestBid(ev) != null && <span className="cell-bid">Bid: {fmtPrice(getBestBid(ev))}</span>}
+        {getBestAsk(ev) != null && <span className="cell-ask">Ask: {fmtPrice(getBestAsk(ev))}</span>}
       </div>
   )
 }
@@ -436,8 +446,9 @@ function LiquiditySummary({ columns }) {
       <div className="liq-formulas">
         <p>Available Liquidity = Σ(bid sizes + ask sizes)</p>
         <p>Available Volume = Σ(size × probability)</p>
-        <p>Matched Liquidity / Volume = Traded amount from exchange</p>
-        <p>Spread = Last Price(Home) + Last Price(Away) + Last Price(Draw). Fair market = 100¢</p>
+        <p>Matched Liquidity = Traded amount from exchange</p>
+        <p>Spread = Σ Last Price per outcome. Fair market = 100¢</p>
+        <p>Betfair: £ GBP with ($USD) conversion at ×1.27</p>
       </div>
       <table>
         <thead>
@@ -449,26 +460,35 @@ function LiquiditySummary({ columns }) {
         <tbody>
           <tr>
             <td title="Σ(bid sizes + ask sizes)">Available Liquidity</td>
-            {MARKET_ORDER.map(m => <td key={m}>${stats[m].availLiq.toFixed(0)}</td>)}
+            {MARKET_ORDER.map(m => {
+              const v = stats[m].availLiq
+              return <td key={m}>{m === 'betfair' ? `£${v.toFixed(0)} ($${(v*1.27).toFixed(0)})` : `$${v.toFixed(0)}`}</td>
+            })}
           </tr>
           <tr>
             <td title="Σ(size × price)">Available Volume</td>
-            {MARKET_ORDER.map(m => <td key={m}>${stats[m].availVol.toFixed(0)}</td>)}
+            {MARKET_ORDER.map(m => {
+              const v = stats[m].availVol
+              return <td key={m}>{m === 'betfair' ? `£${v.toFixed(0)} ($${(v*1.27).toFixed(0)})` : `$${v.toFixed(0)}`}</td>
+            })}
           </tr>
           <tr>
             <td>Matched Liquidity</td>
-            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
+            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? (m === 'betfair' ? `£${stats[m].matchedLiq.toFixed(0)} ($${(stats[m].matchedLiq*1.27).toFixed(0)})` : `$${stats[m].matchedLiq.toFixed(0)}`) : '—'}</td>)}
           </tr>
           <tr>
-            <td>Matched Volume</td>
-            {MARKET_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? `$${stats[m].matchedLiq.toFixed(0)}` : '—'}</td>)}
-          </tr>
-          <tr className="overround-row">
             <td title="Spread = Σ Last Price (or Best Bid if no last price). Fair market = 100¢">Spread</td>
             {MARKET_ORDER.map(m => <td key={m}>{stats[m].overround != null ? `${(stats[m].overround * 100).toFixed(1)}¢` : '—'}</td>)}
           </tr>
         </tbody>
       </table>
+      <div className="liq-formulas" style={{marginTop: 8}}>
+        <p><strong>BTX / Betfair Raw ↔ Predict Format:</strong></p>
+        <p>Raw → Predict: probability = 1 / decimal_odds × 100 (¢)</p>
+        <p>Predict → Raw: decimal_odds = 1 / (probability / 100)</p>
+        <p>Example: odds 2.50 → 1/2.50 = 0.40 = 40.0¢ | 40.0¢ → 1/0.40 = 2.50</p>
+        <p>Betfair currency: £1 GBP = $1.27 USD</p>
+      </div>
     </div>
   )
 }

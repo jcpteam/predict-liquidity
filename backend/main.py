@@ -831,104 +831,11 @@ async def _kalshi_poll_stream(websocket: WebSocket, mapping, kalshi_adapter, sto
 
 
 async def _betfair_poll_stream(websocket: WebSocket, mapping, betfair_adapter, stop_event):
-    """Betfair Stream API 实时推送 orderbook 数据
-    使用 SSL TCP 连接 stream-api.betfair.com:443
-    如果 Stream API 不可用（缺少认证），回退到 REST 轮询
-    """
-    import json as _json
-
+    """Betfair REST 全量轮询（每 10 秒）"""
     betfair_market_id = mapping.mappings.get("betfair", "")
     if not betfair_market_id:
         return
 
-    # 先尝试获取 runner 名称（用于显示）
-    runner_names: dict[int, str] = {}
-    try:
-        cats = await betfair_adapter.client.post(
-            f"{betfair_adapter.REST_URL}/listMarketCatalogue/",
-            json={
-                "filter": {"marketIds": [betfair_market_id]},
-                "marketProjection": ["RUNNER_DESCRIPTION", "EVENT"],
-                "maxResults": 1,
-            },
-            headers=betfair_adapter._rest_headers(),
-        )
-        if cats.status_code == 200:
-            for cat in cats.json():
-                for r in cat.get("runners", []):
-                    runner_names[r["selectionId"]] = r.get("runnerName", str(r["selectionId"]))
-    except Exception:
-        pass
-
-    # 尝试 Stream API 连接
-    conn = await betfair_adapter.stream_connect()
-    if conn:
-        reader, writer = conn
-        try:
-            # 订阅市场
-            await betfair_adapter.stream_subscribe_market(writer, [betfair_market_id])
-
-            # 读取实时数据流
-            while not stop_event.is_set():
-                try:
-                    line = await asyncio.wait_for(reader.readline(), timeout=30)
-                    if not line:
-                        break
-                    msg = _json.loads(line.decode().strip())
-                    op = msg.get("op")
-
-                    if op == "mcm":
-                        # MarketChangeMessage
-                        for mc in msg.get("mc", []):
-                            # 从 marketDefinition 更新 runner 名称
-                            mdef = mc.get("marketDefinition")
-                            if mdef:
-                                for rd in mdef.get("runners", []):
-                                    rid = rd.get("id")
-                                    if rid:
-                                        runner_names.setdefault(rid, str(rid))
-
-                            events = betfair_adapter.parse_market_change(mc, runner_names)
-                            if events:
-                                market_data = [ev.model_dump(mode="json") for ev in events]
-                                await websocket.send_json({
-                                    "type": "betfair_update",
-                                    "market": "betfair",
-                                    "events": market_data,
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                                })
-
-                    elif op == "status" and msg.get("statusCode") == "FAILURE":
-                        print(f"[ws-betfair] Stream error: {msg.get('errorCode')}")
-                        break
-
-                except asyncio.TimeoutError:
-                    # 发送 heartbeat
-                    try:
-                        hb = _json.dumps({"op": "heartbeat", "id": 99}) + "\r\n"
-                        writer.write(hb.encode())
-                        await writer.drain()
-                    except Exception:
-                        break
-                except WebSocketDisconnect:
-                    return
-                except asyncio.CancelledError:
-                    return
-                except Exception as e:
-                    print(f"[ws-betfair] Stream read error: {e}")
-                    break
-        finally:
-            try:
-                writer.close()
-                await writer.wait_closed()
-            except Exception:
-                pass
-
-        # Stream 断开后，如果没有停止，回退到轮询
-        if not stop_event.is_set():
-            print("[ws-betfair] Stream disconnected, falling back to REST polling")
-
-    # 回退: REST 轮询（每 10 秒）
     while not stop_event.is_set():
         try:
             await asyncio.sleep(10)

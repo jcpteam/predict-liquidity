@@ -225,31 +225,31 @@ function OutcomeCellDiv({ ev, platform, onClick }) {
   return (
     <div className="mkt-outcome-cell mkt-td-data" onClick={onClick} role="button" tabIndex={0}>
       <Tip text={isOdds ? `Best Bid (decimal odds). Lower odds = higher probability. prob = 1/odds` : `Best Bid (probability ¢)`}>
-        <div className="mkt-cell-bid">
-          Bid: {isOdds ? (bidOdds ? `${bidOdds} (${(bid * 100).toFixed(1)}¢)` : '—') : (bid != null ? `${(bid * 100).toFixed(1)}¢` : '—')}
-        </div>
+        {/*<div className="mkt-cell-bid">*/}
+        {/*  Bid: {isOdds ? (bidOdds ? `${bidOdds} (${(bid * 100).toFixed(1)}¢)` : '—') : (bid != null ? `${(bid * 100).toFixed(1)}¢` : '—')}*/}
+        {/*</div>*/}
       </Tip>
       <Tip text={isOdds ? `Best Ask (decimal odds). prob = 1/odds` : `Best Ask (probability ¢)`}>
-        <div className="mkt-cell-ask">
-          Ask: {isOdds ? (askOdds ? `${askOdds} (${(ask * 100).toFixed(1)}¢)` : '—') : (ask != null ? `${(ask * 100).toFixed(1)}¢` : '—')}
-        </div>
+        {/*<div className="mkt-cell-ask">*/}
+        {/*  Ask: {isOdds ? (askOdds ? `${askOdds} (${(ask * 100).toFixed(1)}¢)` : '—') : (ask != null ? `${(ask * 100).toFixed(1)}¢` : '—')}*/}
+        {/*</div>*/}
       </Tip>
       <Tip text={`Liquidity = Σ(bid sizes) + Σ(ask sizes).${isBf ? ` £${liq.toFixed(0)} × ${GBP_TO_USD} = $${usdLiq.toFixed(0)}` : ''}`}>
-        <div className="mkt-cell-liq-detail">
-          Liquidity: {formatAmt(liq, platform, false)}
-          {platform !== 'btx' && platform !== 'kalshi' && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
-        </div>
+        {/*<div className="mkt-cell-liq-detail">*/}
+        {/*  Liquidity: {formatAmt(liq, platform, false)}*/}
+        {/*  {platform !== 'btx' && platform !== 'kalshi' && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}*/}
+        {/*</div>*/}
       </Tip>
-      <Tip text={isOdds
-        ? `Bid-Ask Spread: odds diff = ${spreadOdds || '—'}, prob diff = ${spreadProb != null ? (spreadProb * 100).toFixed(1) + '¢' : '—'}. Formula: |1/ask_odds − 1/bid_odds|×100`
-        : `Bid-Ask Spread = |Ask − Bid|. Smaller = tighter market.`}>
-        <div className="mkt-cell-spread-detail">
-          Spread: {isOdds
-            ? (spreadOdds != null ? `${spreadOdds} odds` : '—')
-            : (spreadProb != null ? `${(spreadProb * 100).toFixed(1)}¢` : '—')}
-          {isOdds && spreadProb != null && <span className="mkt-cell-conv"> ({(spreadProb * 100).toFixed(1)}¢)</span>}
-        </div>
-      </Tip>
+      {/*<Tip text={isOdds*/}
+      {/*  ? `Bid-Ask Spread: odds diff = ${spreadOdds || '—'}, prob diff = ${spreadProb != null ? (spreadProb * 100).toFixed(1) + '¢' : '—'}. Formula: |1/ask_odds − 1/bid_odds|×100`*/}
+      {/*  : `Bid-Ask Spread = |Ask − Bid|. Smaller = tighter market.`}>*/}
+      {/*  <div className="mkt-cell-spread-detail">*/}
+      {/*    Spread: {isOdds*/}
+      {/*      ? (spreadOdds != null ? `${spreadOdds} odds` : '—')*/}
+      {/*      : (spreadProb != null ? `${(spreadProb * 100).toFixed(1)}¢` : '—')}*/}
+      {/*    {isOdds && spreadProb != null && <span className="mkt-cell-conv"> ({(spreadProb * 100).toFixed(1)}¢)</span>}*/}
+      {/*  </div>*/}
+      {/*</Tip>*/}
     </div>
   )
 }
@@ -263,19 +263,19 @@ function MarketPlatformStatsDiv({ btxMkt, platform, otherMarkets, betfairEvents 
 
   return (
     <div className="mkt-col-substats">
-      <Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Overround = Σ(best bid probability) across all outcomes; fair market = 100¢, >100¢ = house edge.">
-        <div className="mkt-col-stats-hdr">Liquidity / Overround ⓘ</div>
-      </Tip>
+      {/*<Tip text="Liquidity = Σ(bid sizes + ask sizes) for all outcomes. Overround = Σ(best bid probability) across all outcomes; fair market = 100¢, >100¢ = house edge.">*/}
+      {/*  <div className="mkt-col-stats-hdr">Liquidity / Overround ⓘ</div>*/}
+      {/*</Tip>*/}
       <Tip text={`Liquidity = Σ(all bid+ask sizes) in ${platform.toUpperCase()}.${isBf ? ` £${rawLiq.toFixed(0)} GBP × ${GBP_TO_USD} = $${usdLiq.toFixed(0)} USD` : ''}`}>
-        <div className="mkt-stat-liq">
-          Liquidity: {formatAmt(rawLiq, platform, false)}
-          {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}
-        </div>
+        {/*<div className="mkt-stat-liq">*/}
+        {/*  Liquidity: {formatAmt(rawLiq, platform, false)}*/}
+        {/*  {isBf && <span className="mkt-cell-conv"> (${usdLiq.toFixed(0)} USD)</span>}*/}
+        {/*</div>*/}
       </Tip>
       <Tip text={`Overround = Σ best_bid(each outcome) as probability.${isOdds ? ' For odds: prob=1/odds, Σ(prob)×100.' : ''} Fair=100¢, >100¢=house edge.`}>
-        <div className="mkt-stat-spread">
-          Overround: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}
-        </div>
+        {/*<div className="mkt-stat-spread">*/}
+        {/*  Overround: {st.spread != null ? `${(st.spread * 100).toFixed(1)}¢` : '—'}*/}
+        {/*</div>*/}
       </Tip>
     </div>
   )
@@ -305,7 +305,9 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
 
       subBlocks.push(
         <div key={btxMkt.market_id} className="mkt-col-subcard">
-          <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)}>
+          <button type="button" className="mkt-col-subtitle"
+            onClick={btxMkt.market_type === 'FOOTBALL_FULL_TIME_MATCH_ODDS' ? () => onSelectMarket(btxMkt.market_type, btxMkt.market_id) : undefined}
+            style={btxMkt.market_type !== 'FOOTBALL_FULL_TIME_MATCH_ODDS' ? {cursor: 'default'} : {}}>
             {marketLabel}
           </button>
           {rows.map(({ btxEv, btxLabel, btxIsDraw, displayLabel, idx }) => {
@@ -321,14 +323,14 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
             return (
               <div key={idx} className="mkt-col-outcome-line">
                 <span className="mkt-col-outcome-lbl">{displayLabel}</span>
-                {ev ? (
-                  <OutcomeCellDiv ev={ev} platform={platform}
-                    onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)} />
-                ) : (
-                  <div className={`mkt-col-outcome-empty mkt-td-${emptyKind}`}>
-                    {emptyKind === 'na' ? 'N/A' : '—'}
-                  </div>
-                )}
+                {/*{ev ? (*/}
+                {/*  <OutcomeCellDiv ev={ev} platform={platform}*/}
+                {/*    onClick={() => onSelectMarket(btxMkt.market_type, btxMkt.market_id)} />*/}
+                {/*) : (*/}
+                {/*  <div className={`mkt-col-outcome-empty mkt-td-${emptyKind}`}>*/}
+                {/*    {emptyKind === 'na' ? 'N/A' : '—'}*/}
+                {/*  </div>*/}
+                {/*)}*/}
               </div>
             )
           })}
@@ -410,7 +412,7 @@ function PolymarketColumn({ otherMarkets, onSelectMarket }) {
 
             return (
               <div key={midx} className="mkt-col-subcard">
-                <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}>
+                <button type="button" className="mkt-col-subtitle" style={{cursor: 'default'}}>
                   {market.display_name || market.market_type_display || group.market_type_display}
                   {market.line != null && <span className="market-line"> (line: {market.line})</span>}
                 </button>
@@ -430,11 +432,11 @@ function PolymarketColumn({ otherMarkets, onSelectMarket }) {
                     return (
                       <div key={evIdx} className="mkt-col-outcome-line">
                         <span className="mkt-col-outcome-lbl">{label}</span>
-                        <OutcomeCellDiv
-                          ev={ev}
-                          platform="polymarket"
-                          onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}
-                        />
+                        {/*<OutcomeCellDiv*/}
+                        {/*  ev={ev}*/}
+                        {/*  platform="polymarket"*/}
+                        {/*  onClick={() => onSelectMarket(market.market_type || group.market_type, market.market_id)}*/}
+                        {/*/>*/}
                       </div>
                     )
                   })
@@ -497,17 +499,16 @@ function KalshiColumn({ otherMarkets, onSelectMarket }) {
           <div key={idx} className="mkt-col-cat">
             <div className="mkt-col-cat-title">{marketTypeDisplay}</div>
             <div className="mkt-col-subcard">
-              <button type="button" className="mkt-col-subtitle" onClick={() => onSelectMarket('kalshi')}>
-                {market.display_name || marketTypeDisplay}
+              <button type="button" className="mkt-col-subtitle" style={{cursor: 'default'}}>                {market.display_name || marketTypeDisplay}
               </button>
               {marketOutcomes.map((ev, evIdx) => (
                 <div key={evIdx} className="mkt-col-outcome-line">
                   <span className="mkt-col-outcome-lbl">{ev.outcome || ''}</span>
-                  <OutcomeCellDiv
-                    ev={ev}
-                    platform="kalshi"
-                    onClick={() => onSelectMarket('kalshi')}
-                  />
+                  {/*<OutcomeCellDiv*/}
+                  {/*  ev={ev}*/}
+                  {/*  platform="kalshi"*/}
+                  {/*  onClick={() => onSelectMarket('kalshi')}*/}
+                  {/*/>*/}
                 </div>
               ))}
               <MarketPlatformStatsDiv
@@ -533,10 +534,10 @@ function PlatformHeaderRow({ counts, showUSD }) {
             <span className="mkt-platform-name">{p.toUpperCase()}</span>
             <span className="mkt-platform-count">: {counts[p]}</span>
           </div>
-          <span className="mkt-th-currency mkt-platform-sub">
-            {showUSD ? 'USD' : PLATFORM_CURRENCY[p].code}
-            {ODDS_PLATFORMS.has(p) ? ' (ODDS)' : ' (PROB)'}
-          </span>
+          {/*<span className="mkt-th-currency mkt-platform-sub">*/}
+          {/*  {showUSD ? 'USD' : PLATFORM_CURRENCY[p].code}*/}
+          {/*  {ODDS_PLATFORMS.has(p) ? ' (ODDS)' : ' (PROB)'}*/}
+          {/*</span>*/}
         </div>
       ))}
     </div>
@@ -581,12 +582,12 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
         <div className="detail-title-meta">
           {data.event_time && <span className="detail-time">🕐 {new Date(data.event_time).toLocaleString()}</span>}
           {data.event_time && isLive(data.event_time) && <span className="live-dot">● LIVE</span>}
-          <Tip text="Total quotes = sum of all outcomes across all market labels (e.g. Match Odds 3 + Total Goals 4 = 7).">
-            <span className="mkt-all-markets-total">All markets: {totalAllMarkets}</span>
-          </Tip>
-          <button type="button" className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>
-            {showUSD ? '$ All USD' : '🔄 Convert to USD'}
-          </button>
+          {/*<Tip text="Total quotes = sum of all outcomes across all market labels (e.g. Match Odds 3 + Total Goals 4 = 7).">*/}
+          {/*  <span className="mkt-all-markets-total">All markets: {totalAllMarkets}</span>*/}
+          {/*</Tip>*/}
+          {/*<button type="button" className={`currency-toggle ${showUSD ? 'active' : ''}`} onClick={() => setShowUSD(!showUSD)}>*/}
+          {/*  {showUSD ? '$ All USD' : '🔄 Convert to USD'}*/}
+          {/*</button>*/}
         </div>
       </div>
 
