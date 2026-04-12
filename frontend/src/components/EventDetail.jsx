@@ -194,7 +194,7 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
           if (!prev) return prev
           const pmEvents = [...(prev.markets.polymarket || [])]
           for (let i = 0; i < pmEvents.length; i++) {
-            if (pmEvents[i].outcome === data.outcome || pmEvents[i].event_title === data.title) {
+            if (pmEvents[i].outcome === data.outcome && pmEvents[i].event_title === data.title) {
               pmEvents[i] = { ...pmEvents[i], order_book: { bids: data.bids, asks: data.asks } }
               break
             }
@@ -204,15 +204,22 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
         setLastUpdate(new Date())
       },
       onPriceChange: (data) => {
-        setOrderBookData(prev => {
+        console.log("data",data);
+           setOrderBookData(prev => {
           if (!prev) return prev
-          const pmEvents = [...(prev.markets.polymarket || [])]
+          const pmEvents = [...(prev.markets.polymarket || [])];
+
           for (let i = 0; i < pmEvents.length; i++) {
-            if (pmEvents[i].outcome === data.outcome) {
-              pmEvents[i] = { ...pmEvents[i], last_price: parseFloat(data.price) || pmEvents[i].last_price }
-              break
+            if (pmEvents[i].outcome === data.outcome && pmEvents[i].token_id === data.asset_id && data.side == 'SELL') {
+              const totalPrice = pmEvents.reduce((sum,item) => sum + parseFloat(item.last_price),0);
+              const finalTotalPrice = totalPrice -pmEvents[i].last_price + parseFloat(data.price);
+              if(finalTotalPrice < 1.08 && finalTotalPrice > 1){
+                pmEvents[i] = { ...pmEvents[i], last_price: parseFloat(data.price) || pmEvents[i].last_price }
+              }
+              break;
             }
           }
+
           return { ...prev, markets: { ...prev.markets, polymarket: pmEvents } }
         })
         setLastUpdate(new Date())
@@ -284,7 +291,7 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
     const updated = await fetchEventMapping(unifiedId)
     setMapping(updated)
     onMappingChange()
-    connectWs(unifiedId)
+  //  connectWs(unifiedId)
   }
   const handleRemove = async (marketName) => {
     await removeMarketMapping(unifiedId, marketName)
