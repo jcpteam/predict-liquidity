@@ -427,8 +427,8 @@ function LiquiditySummary({ columns }) {
       if (ev && ev.order_book) {
         const bids = ev.order_book.bids || []
         const asks = ev.order_book.asks || []
-        availLiq += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
-        availVol += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
+        availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
+        availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
         if (bids.length) {
           // Use last_price for spread if available (avoids outlier bids)
           const spreadPrice = getSpreadPrice(ev)
@@ -444,8 +444,8 @@ function LiquiditySummary({ columns }) {
     <div className="liquidity-summary">
       <h3>Summary</h3>
       <div className="liq-formulas">
-        <p>Available Liquidity = Σ(size × price) — dollar value of all orders</p>
-        <p>Available Volume = Σ(sizes) — total contracts/shares</p>
+        <p>Available Liquidity = Σ(bid sizes + ask sizes)</p>
+        <p>Available Volume = Σ(sizes × probability)</p>
         <p>Matched Liquidity = 24h traded volume (PM: USDC, Kalshi: USD, Betfair: GBP totalMatched, BTX: USD traded)</p>
         <p>Spread = Σ Last Price per outcome. Fair market = 100¢</p>
         <p>Betfair: £ GBP with ($USD) conversion at ×1.27</p>
@@ -459,14 +459,14 @@ function LiquiditySummary({ columns }) {
         </thead>
         <tbody>
           <tr>
-            <td title="Σ(size × price) — dollar value">Available Liquidity</td>
+            <td title="Σ(bid sizes + ask sizes)">Available Liquidity</td>
             {MARKET_ORDER.map(m => {
               const v = stats[m].availLiq
               return <td key={m}>{m === 'betfair' ? `£${v.toFixed(0)} ($${(v*1.27).toFixed(0)})` : `$${v.toFixed(0)}`}</td>
             })}
           </tr>
           <tr>
-            <td title="Σ(sizes) — total contracts">Available Volume</td>
+            <td title="Σ(sizes × probability)">Available Volume</td>
             {MARKET_ORDER.map(m => {
               const v = stats[m].availVol
               return <td key={m}>{m === 'betfair' ? `£${v.toFixed(0)} ($${(v*1.27).toFixed(0)})` : `$${v.toFixed(0)}`}</td>
