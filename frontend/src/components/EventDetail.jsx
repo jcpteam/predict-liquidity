@@ -411,7 +411,7 @@ function ShowSubHeader ({ev,showOdds}){
 
   return (
       <div className="cell-meta">
-        {ev.last_price != null && <span className="price">{fmtPrice(ev.last_price)}</span>}
+        <span className="price">{fmtPrice(ev.last_price ?? getBestBid(ev))}</span>
         {getBestBid(ev) != null && <span className="cell-bid">Bid: {fmtPrice(getBestBid(ev))}</span>}
         {getBestAsk(ev) != null && <span className="cell-ask">Ask: {fmtPrice(getBestAsk(ev))}</span>}
       </div>
