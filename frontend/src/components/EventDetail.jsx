@@ -404,6 +404,7 @@ function ShowSubHeader ({ev,showOdds}){
   // showOdds=true → raw format (platform native: odds for BTX/Betfair, ¢ for PM/Kalshi)
   const mname = ev.market_name || ''
   const isExchange = mname === 'btx' || mname === 'betfair'
+  const isBtx = mname === 'btx'
 
   const fmtPrice = (p) => {
     if (p == null) return '—'
@@ -411,9 +412,19 @@ function ShowSubHeader ({ev,showOdds}){
     return (p * 100).toFixed(1) + '¢'
   }
 
+  // Calculate mid price: (best ask + best bid) / 2
+  const bestBid = getBestBid(ev)
+  const bestAsk = getBestAsk(ev)
+  let displayPrice
+  if (isBtx && bestBid != null && bestAsk != null) {
+    displayPrice = (bestBid + bestAsk) / 2
+  } else {
+    displayPrice = ev.last_price ?? bestBid
+  }
+
   return (
       <div className="cell-meta">
-        <span className="price">{fmtPrice(ev.last_price ?? getBestBid(ev))}</span>
+        <span className="price">{fmtPrice(displayPrice)}</span>
         {getBestBid(ev) != null && <span className="cell-bid">Bid: {fmtPrice(getBestBid(ev))}</span>}
         {getBestAsk(ev) != null && <span className="cell-ask">Ask: {fmtPrice(getBestAsk(ev))}</span>}
       </div>
