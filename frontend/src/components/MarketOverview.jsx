@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { fetchAllMarkets } from '../api'
 
 // const PLATFORMS = ['btx', 'polymarket', 'kalshi', 'betfair']
-const PLATFORMS = ['btx', 'polymarket', 'kalshi', 'Platform F']
+const PLATFORMS = ['btx', 'polymarket', 'kalshi','Platform F','betfair']
 const PLATFORM_CURRENCY = {
   btx: { symbol: '$', code: 'USD' },
   polymarket: { symbol: '', code: 'USDC' },
@@ -283,6 +283,8 @@ function MarketPlatformStatsDiv({ btxMkt, platform, otherMarkets, betfairEvents 
 }
 
 function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSelectMarket }) {
+  console.log("betfairPerBtx",platform);
+
   if (platform === 'polymarket') {
     return <PolymarketColumn otherMarkets={otherMarkets} onSelectMarket={onSelectMarket} />
   }
@@ -335,8 +337,7 @@ function PlatformColumn({ platform, grouped, otherMarkets, betfairPerBtx, onSele
               </div>
             )
           })}
-          <MarketPlatformStatsDiv btxMkt={btxMkt} platform={platform} otherMarkets={otherMarkets}
-            betfairEvents={betfairEvents} />
+
         </div>
       )
     }
@@ -528,9 +529,9 @@ function KalshiColumn({ otherMarkets, onSelectMarket }) {
 
 function PlatformHeaderRow({ counts, showUSD }) {
   return (
-    <div className="mkt-platform-header-row">
+    <div className="mkt-platform-header-row" style={{gridAutoFlow: "column",gridAutoColumns: "1fr" }} >
       {PLATFORMS.map(p => (
-        <div key={p} className="mkt-platform-head">
+        <div key={p} className="mkt-platform-head" >
           <div className="mkt-platform-name-line">
             <span className="mkt-platform-name">{p.toUpperCase()}</span>
             <span className="mkt-platform-count">: {counts[p]}</span>
@@ -549,11 +550,24 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showUSD, setShowUSD] = useState(false)
+  const [, forceUpdate] = useState({});
 
   useEffect(() => {
     setLoading(true)
     fetchAllMarkets(unifiedId).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [unifiedId])
+
+  const handleKeyDownMarket = (e) => {
+    // 按 CTRL + B
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b'|| e.key === 'B')) {
+      if(PLATFORMS.includes("betfair")){
+        PLATFORMS.splice(PLATFORMS.indexOf("betfair"),1);
+      }else{
+        PLATFORMS.push("betfair");
+      }
+      forceUpdate({});
+    }
+  };
 
   const grouped = useMemo(() => {
     if (!data?.btx_markets) return {}
@@ -576,8 +590,10 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
   const perPlatformCounts = getPerPlatformQuoteCounts(btxMarkets, otherMarkets, betfairPerBtx)
   const totalAllMarkets = totalOutcomeCount
 
+
+
   return (
-    <div className="detail-page mkt-dashboard">
+    <div className="detail-page mkt-dashboard" tabIndex={0} onKeyDown={handleKeyDownMarket}>
       <div className="detail-title-bar">
         <h2>{displayName || data.display_name}</h2>
         <div className="detail-title-meta">
@@ -594,7 +610,7 @@ export default function MarketOverview({ unifiedId, displayName, onSelectMarket 
 
       <PlatformHeaderRow counts={perPlatformCounts} showUSD={showUSD} />
 
-      <div className="mkt-columns-grid">
+      <div className="mkt-columns-grid" style={{gridAutoFlow: "column",gridAutoColumns: "1fr"}}>
         {PLATFORMS.map(p => (
           <PlatformColumn
             key={p}

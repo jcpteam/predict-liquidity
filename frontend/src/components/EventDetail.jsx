@@ -3,7 +3,7 @@ import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketE
 import OrderBookChart from './OrderBookChart.jsx'
 
 // const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
-const MARKET_ORDER = ['btx', 'polymarket', 'kalshi']
+const MARKET_ORDER = ['btx', 'polymarket', 'kalshi'];
 // Get the display label for an outcome event
 // Polymarket: outcome is always "Yes", real info is in event_title
 // Others: outcome is the team name or "Draw"
@@ -204,7 +204,7 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
         setLastUpdate(new Date())
       },
       onPriceChange: (data) => {
-        console.log("data",data);
+
            setOrderBookData(prev => {
           if (!prev) return prev
           const pmEvents = [...(prev.markets.polymarket || [])];
@@ -276,6 +276,18 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
     doAutoMatchAndConnect()
   }, [mapping?.unified_id])
 
+
+  const handleKeyDownOrder = (e) => {
+    // 按 CTRL + B
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b'|| e.key === 'B')) {
+      if(MARKET_ORDER.includes("betfair")){
+        MARKET_ORDER.splice(MARKET_ORDER.indexOf("betfair"),1);
+      }else{
+        MARKET_ORDER.push("betfair");
+      }
+    }
+  };
+
   const otherMarkets = markets.filter(m => m !== 'btx')
   useEffect(() => {
     if (otherMarkets.length > 0 && !selectedMarket) setSelectedMarket(otherMarkets[0])
@@ -305,7 +317,7 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
   const columns = orderBookData ? buildOutcomeColumns(orderBookData.markets || {}) : []
 
   return (
-    <div className="detail-page">
+    <div  tabIndex={0} className="detail-page" onKeyDown={handleKeyDownOrder}>
       <div className="detail-title-bar">
         <h2>{mapping.display_name}</h2>
         <div className="detail-title-meta">
