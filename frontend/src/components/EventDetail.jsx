@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchEventMapping, addMarketMapping, removeMarketMapping, searchMarketEvents, autoMatchMarket, createOrderBookSocket } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
 
-const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
-
+// const MARKET_ORDER = ['btx', 'polymarket', 'kalshi', 'betfair']
+const MARKET_ORDER = ['btx', 'polymarket', 'kalshi']
 // Get the display label for an outcome event
 // Polymarket: outcome is always "Yes", real info is in event_title
 // Others: outcome is the team name or "Draw"
@@ -323,13 +323,15 @@ export default function EventDetail({ unifiedId, markets, btxMarketId, onMapping
       <div className="linked-section">
         <h3>Linked Markets</h3>
         <div className="linked-list">
-          {Object.entries(mapping.mappings).map(([name, id]) => (
-            <div key={name} className="linked-item">
-              <span className="market-badge">{name}</span>
-              <code>{id}</code>
-              {name !== 'btx' && <button className="btn-danger btn-sm" onClick={() => handleRemove(name)}>✕</button>}
-            </div>
-          ))}
+          {Object.entries(mapping.mappings)
+              .filter(([name]) => name !== 'betfair')
+              .map(([name, id]) => (
+                  <div key={name} className="linked-item">
+                    <span className="market-badge">{name}</span>
+                    <code>{id}</code>
+                    {name !== 'btx' && <button className="btn-danger btn-sm" onClick={() => handleRemove(name)}>✕</button>}
+                  </div>
+              ))}
         </div>
         {!addingMarket ? (
           <button onClick={() => setAddingMarket(true)} style={{marginTop: 8}}>+ Link Another Market</button>
