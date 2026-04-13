@@ -194,6 +194,11 @@ class BetfairAdapter(BaseMarketAdapter):
                     for a in ex.get("availableToLay", []) if a["price"] > 0]
             return OrderBook(bids=bids, asks=asks, timestamp=datetime.now(timezone.utc))
         except Exception as e:
+            if ('400' in str(e) or '401' in str(e)) and self.session_token:
+                self.session_token = ""
+                await self._login()
+                if self.session_token:
+                    return await self.fetch_order_book(market_id, outcome)
             print(f"[betfair] fetch_order_book error: {e}")
             return None
 
@@ -262,6 +267,14 @@ class BetfairAdapter(BaseMarketAdapter):
                 ))
             return events
         except Exception as e:
+            # If 400/401, session likely expired — retry with fresh login
+            err_str = str(e)
+            if ('400' in err_str or '401' in err_str) and self.session_token:
+                print(f"[betfair] Session expired, re-logging...")
+                self.session_token = ""
+                await self._login()
+                if self.session_token:
+                    return await self.fetch_event(market_id)
             print(f"[betfair] fetch_event error: {e}")
             return []
 
