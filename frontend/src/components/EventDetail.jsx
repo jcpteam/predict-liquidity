@@ -465,11 +465,9 @@ function LiquiditySummary({ columns }) {
         const asks = ev.order_book.asks || []
         availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
         availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
-        if (bids.length) {
-          // Use last_price for spread if available (avoids outlier bids)
-          const spreadPrice = getSpreadPrice(ev)
-          if (spreadPrice != null) { bidSum += spreadPrice; bidCount++ }
-        }
+        // Spread: BTX uses min ask, others use last_price or bestBid
+        const spreadPrice = getSpreadPrice(ev, mname)
+        if (spreadPrice != null) { bidSum += spreadPrice; bidCount++ }
       }
       if (ev && ev.volume_24h != null) { matchedLiq += Number(ev.volume_24h); hasMatched = true }
     }
