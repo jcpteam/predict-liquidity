@@ -427,6 +427,7 @@ function ShowSubHeader ({ev,showOdds}){
   const mname = ev.market_name || ''
   const isExchange = mname === 'btx' || mname === 'betfair'
   const isBtx = mname === 'btx'
+  const isPolymarket = mname === 'polymarket'
 
   const fmtPrice = (p) => {
     if (p == null) return '—'
@@ -440,6 +441,8 @@ function ShowSubHeader ({ev,showOdds}){
   const minBid = getMinBid(ev)
   let displayPrice
   if (isBtx && bestAsk != null) {
+    displayPrice = bestAsk
+  } else if (isPolymarket && bestAsk != null) {
     displayPrice = bestAsk
   } else {
     displayPrice = ev.last_price ?? bestBid
