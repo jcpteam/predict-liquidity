@@ -17,6 +17,8 @@ message StreamMarketDataRequest {
   int64 stream_orders_after_timestamp = 5;
   bool stream_prices = 6;
   int64 stream_prices_after_timestamp = 7;
+  bool disable_synthetic_prices = 8;
+  int32 market_prices_choice = 9;
 }
 
 message MarketDataStreamingMessage {
@@ -118,8 +120,9 @@ message MarketPrices {
   string market_id = 1;
   int64 timestamp = 2;
   uint64 traded = 3;
-  repeated RunnerPrices runner_prices = 4;
+  repeated RunnerPrices decimal_prices = 4;
   int32 status = 5;
+  repeated RunnerPrices share_prices = 6;
 }
 
 message RunnerPrices {

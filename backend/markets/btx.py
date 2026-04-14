@@ -182,6 +182,8 @@ class BTXAdapter(BaseMarketAdapter):
             stream_prices_after_timestamp=0,
             stream_ref_data=stream_ref_data,
             stream_ref_data_after_timestamp=0,
+            disable_synthetic_prices=True,
+            market_prices_choice=2,
         )
         return self._stub.StreamMarketData(req, metadata=self._grpc_metadata())
 
@@ -193,7 +195,7 @@ class BTXAdapter(BaseMarketAdapter):
             mid = mp.market_id
             market_traded = mp.traded  # total matched volume for this market (USD)
             events = []
-            for rp in mp.runner_prices:
+            for rp in mp.decimal_prices:
                 rid = rp.runner_id
                 runner_traded = rp.traded if rp.traded else 0
                 # Get handicap value for Asian Handicap / Goal Lines
@@ -232,7 +234,7 @@ class BTXAdapter(BaseMarketAdapter):
                     outcome=display_name,
                     order_book=ob,
                     last_price=round(1.0 / ltp, 4) if ltp and ltp > 1 else ltp,
-                    volume_24h=float(runner_traded) if runner_traded else (float(market_traded) if market_traded else None),
+                    volume_24h=float(runner_traded) if runner_traded else None,
                 ))
             if events:
                 result[mid] = events
