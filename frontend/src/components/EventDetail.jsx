@@ -146,6 +146,10 @@ function getBestBid(ev) {
   if (!ev || !ev.order_book || !ev.order_book.bids || !ev.order_book.bids.length) return null
   return Math.max(...ev.order_book.bids.map(b => b.price))
 }
+function getMinBid(ev) {
+  if (!ev || !ev.order_book || !ev.order_book.bids || !ev.order_book.bids.length) return null
+  return Math.min(...ev.order_book.bids.map(b => b.price))
+}
 function getBestAsk(ev) {
   if (!ev || !ev.order_book || !ev.order_book.asks || !ev.order_book.asks.length) return null
   return Math.min(...ev.order_book.asks.map(a => a.price))
@@ -424,12 +428,13 @@ function ShowSubHeader ({ev,showOdds}){
     return (p * 100).toFixed(1) + '¢'
   }
 
-  // Calculate mid price: (best ask + best bid) / 2
+  // Calculate display price
   const bestBid = getBestBid(ev)
   const bestAsk = getBestAsk(ev)
+  const minBid = getMinBid(ev)
   let displayPrice
-  if (isBtx && bestBid != null && bestAsk != null) {
-    displayPrice = (bestBid + bestAsk) / 2
+  if (isBtx && minBid != null) {
+    displayPrice = minBid
   } else {
     displayPrice = ev.last_price ?? bestBid
   }
