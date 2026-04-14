@@ -87,9 +87,9 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
                 <div className="match-badges">
                   {ev.is_active === false && <span className="market-badge-sm" style={{background:'#da363333',color:'#f85149'}}>ENDED</span>}
                   {isLive(ev.event_time) && <span className="market-badge-sm badge-live">● LIVE</span>}
-                  {ev.linked_markets.map(m => (
+                  {ev.linked_markets.map(m => 'betfair'!= m ? (
                     <span key={m} className="market-badge-sm">{m}</span>
-                  ))}
+                  ) : <></>) }
                 </div>
               </div>
             </div>
