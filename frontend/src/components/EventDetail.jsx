@@ -433,8 +433,8 @@ function ShowSubHeader ({ev,showOdds}){
   const bestAsk = getBestAsk(ev)
   const minBid = getMinBid(ev)
   let displayPrice
-  if (isBtx && minBid != null) {
-    displayPrice = minBid
+  if (isBtx && bestAsk != null) {
+    displayPrice = bestAsk
   } else {
     displayPrice = ev.last_price ?? bestBid
   }
