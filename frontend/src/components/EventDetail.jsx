@@ -155,8 +155,14 @@ function getBestAsk(ev) {
   return Math.min(...ev.order_book.asks.map(a => a.price))
 }
 // For spread: use last_price if available (more accurate), else best bid
-function getSpreadPrice(ev) {
+// For BTX: use min ask price
+function getSpreadPrice(ev, mname) {
   if (!ev) return null
+  // BTX platform: use min ask
+  if (mname === 'btx') {
+    return getBestAsk(ev)
+  }
+  // Other platforms: use last_price if available, else best bid
   if (ev.last_price != null && ev.last_price > 0 && ev.last_price < 1) return ev.last_price
   return getBestBid(ev)
 }
