@@ -473,7 +473,7 @@ function LiquiditySummary({ columns }) {
         <p>Available Volume = Σ(sizes × probability)</p>
         <p>Matched Liquidity = 24h traded volume (PM: USDC, Kalshi: USD, Betfair: GBP totalMatched, BTX: USD traded)</p>
         <p>Spread = Σ Last Price per outcome. Fair market = 100¢</p>
-        <p>Betfair: £ GBP with ($USD) conversion at ×1.27</p>
+        {MARKET_ORDER.includes("betfair") ?  <p>Betfair: £ GBP with ($USD) conversion at ×1.27</p> : <></>}
       </div>
       <table>
         <thead>
@@ -512,7 +512,9 @@ function LiquiditySummary({ columns }) {
         <p>Raw → Predict: probability = 1 / decimal_odds × 100 (¢)</p>
         <p>Predict → Raw: decimal_odds = 1 / (probability / 100)</p>
         <p>Example: odds 2.50 → 1/2.50 = 0.40 = 40.0¢ | 40.0¢ → 1/0.40 = 2.50</p>
-        <p>Betfair currency: £1 GBP = $1.27 USD</p>
+        { MARKET_ORDER.includes("betfair") ? <p>Betfair currency: £1 GBP = $1.27 USD</p> : <></>
+
+        }
       </div>
     </div>
   )
