@@ -155,8 +155,14 @@ function getBestAsk(ev) {
   return Math.min(...ev.order_book.asks.map(a => a.price))
 }
 // For spread: use last_price if available (more accurate), else best bid
-function getSpreadPrice(ev) {
+// For BTX: use min ask price
+function getSpreadPrice(ev, mname) {
   if (!ev) return null
+  // BTX platform: use min ask
+  if (mname === 'btx') {
+    return getBestAsk(ev)
+  }
+  // Other platforms: use last_price if available, else best bid
   if (ev.last_price != null && ev.last_price > 0 && ev.last_price < 1) return ev.last_price
   return getBestBid(ev)
 }
@@ -459,11 +465,9 @@ function LiquiditySummary({ columns }) {
         const asks = ev.order_book.asks || []
         availLiq += bids.reduce((s, b) => s + b.size, 0) + asks.reduce((s, a) => s + a.size, 0)
         availVol += bids.reduce((s, b) => s + b.size * b.price, 0) + asks.reduce((s, a) => s + a.size * a.price, 0)
-        if (bids.length) {
-          // Use last_price for spread if available (avoids outlier bids)
-          const spreadPrice = getSpreadPrice(ev)
-          if (spreadPrice != null) { bidSum += spreadPrice; bidCount++ }
-        }
+        // Spread: BTX uses min ask, others use last_price or bestBid
+        const spreadPrice = getSpreadPrice(ev, mname)
+        if (spreadPrice != null) { bidSum += spreadPrice; bidCount++ }
       }
       if (ev && ev.volume_24h != null) { matchedLiq += Number(ev.volume_24h); hasMatched = true }
     }
