@@ -5,7 +5,7 @@ import warnings
 
 from btx.api.v1.customer.betting import betting_api_pb2 as btx_dot_api_dot_v1_dot_customer_dot_betting_dot_betting__api__pb2
 
-GRPC_GENERATED_VERSION = '1.78.0'
+GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

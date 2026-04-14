@@ -127,8 +127,8 @@ message RunnerPrices {
   DecimalNumber handicap = 2;
   repeated PriceLevel back_prices = 3;
   repeated PriceLevel lay_prices = 4;
-  DecimalNumber last_traded_price = 5;
-  uint64 traded = 6;
+  uint64 traded = 5;
+  DecimalNumber last_traded_price = 6;
 }
 
 message PriceLevel {
