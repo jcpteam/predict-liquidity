@@ -53,16 +53,18 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
       </div>
       {loading && <p className="empty">Loading events...</p>}
       <div className="match-grid">
-        {filtered.map(ev => {
+        {filtered.map((ev, idx) => {
           const teams = parseTeams(ev.display_name)
+          // 强制生成唯一 ID，防止 unified_id 为空导致 key 重复和页面不跳转
+          const eventId = ev.unified_id || `evt-${(ev.display_name || 'event').replace(/\s+/g, '-')}-${ev.start_time || ev.end_date || idx}`
           return (
             <div
-              key={ev.unified_id}
+              key={eventId}
               className="match-card"
-              onClick={() => onSelectEvent(ev.unified_id, ev)}
+              onClick={() => onSelectEvent(eventId, ev)}
               role="button"
               tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && onSelectEvent(ev.unified_id, ev)}
+              onKeyDown={e => e.key === 'Enter' && onSelectEvent(eventId, ev)}
             >
               {ev.image && <img src={ev.image} alt="" className="match-card-img" />}
               <div className="match-card-body">

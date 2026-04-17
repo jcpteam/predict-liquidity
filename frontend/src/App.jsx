@@ -210,7 +210,12 @@ export default function App() {
           events={events}
           loading={loading || loadingEvents}
           onSelectEvent={(id, ev) => {
-            handleSelectEvent(id, ev?.display_name || '', currentSport === 'cricket' ? ev : null)
+            const eventData = currentSport === 'cricket' && ev ? {
+              display_name: ev.display_name,
+              start_time: ev.start_time || ev.event_time,
+              sport_id: ev.sport_id || 'crkt'
+            } : null
+            handleSelectEvent(id, ev?.display_name || '', eventData)
           }}
         />
       </div>

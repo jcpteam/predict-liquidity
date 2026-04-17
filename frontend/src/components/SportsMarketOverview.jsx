@@ -31,6 +31,32 @@ export default function SportsMarketOverview({ eventData, displayName, onSelectM
     platformData[platform].push(...item.markets)
   })
 
+  // 按 market_type 分组所有平台的数据，用于对齐显示
+  const allMarketTypes = new Set()
+  PLATFORMS.forEach(p => {
+    (platformData[p] || []).forEach(m => allMarketTypes.add(m.market_type))
+  })
+
+  // 排序：Match Odds 放最前面，Completed Match 第二，Tied Match 第三，数字开头的放最后
+  const sortedMarketTypes = Array.from(allMarketTypes).sort((a, b) => {
+    // Match Odds 永远排第一
+    if (a === 'Match Odds') return -1
+    if (b === 'Match Odds') return 1
+    // Completed Match 排第二
+    if (a === 'Completed Match') return -1
+    if (b === 'Completed Match') return 1
+    // Tied Match 排第三
+    if (a === 'Tied Match') return -1
+    if (b === 'Tied Match') return 1
+    // 数字开头的 type 放最后
+    const aStartsWithDigit = /^\d/.test(a)
+    const bStartsWithDigit = /^\d/.test(b)
+    if (aStartsWithDigit && !bStartsWithDigit) return 1
+    if (!aStartsWithDigit && bStartsWithDigit) return -1
+    // 其他按字母顺序
+    return a.localeCompare(b)
+  })
+
   return (
     <div className="detail-page mkt-dashboard">
       <div className="detail-title-bar">
@@ -55,6 +81,7 @@ export default function SportsMarketOverview({ eventData, displayName, onSelectM
             key={platform}
             platform={platform}
             markets={platformData[platform] || []}
+            sortedMarketTypes={sortedMarketTypes}
             onSelectMarket={onSelectMarket}
           />
         ))}
@@ -63,32 +90,36 @@ export default function SportsMarketOverview({ eventData, displayName, onSelectM
   )
 }
 
-function SportsPlatformColumn({ platform, markets, onSelectMarket }) {
-  if (!markets.length) {
+function SportsPlatformColumn({ platform, markets, sortedMarketTypes, onSelectMarket }) {
+  if (!markets.length && !sortedMarketTypes.length) {
     return <div className="mkt-column"><div className="mkt-column-empty">No markets</div></div>
   }
 
   return (
     <div className="mkt-column">
-      {markets.map((market, idx) => (
-        <div key={idx} className="mkt-col-cat">
-          <div className="mkt-col-cat-title">{market.market_type}</div>
-          <div className="mkt-col-subcard">
-            <button
-              type="button"
-              className="mkt-col-subtitle"
-              onClick={() => onSelectMarket?.(market.market_type, null)}
-            >
-              {market.market_type}
-            </button>
-            {market.outcomes?.map((outcome, oIdx) => (
-              <div key={oIdx} className="mkt-col-outcome-line">
-                <span className="mkt-col-outcome-lbl">{outcome.name}</span>
-              </div>
-            ))}
+      {sortedMarketTypes.map(marketType => {
+        const market = markets.find(m => m.market_type === marketType)
+        if (!market) return null
+        return (
+          <div key={marketType} className="mkt-col-cat">
+            <div className="mkt-col-cat-title">{market.market_type}</div>
+            <div className="mkt-col-subcard">
+              <button
+                type="button"
+                className="mkt-col-subtitle"
+                onClick={() => onSelectMarket?.(market.market_type, null)}
+              >
+                {market.market_type}
+              </button>
+              {market.outcomes?.map((outcome, oIdx) => (
+                <div key={oIdx} className="mkt-col-outcome-line">
+                  <span className="mkt-col-outcome-lbl">{outcome.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
