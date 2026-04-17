@@ -45,6 +45,7 @@ async def list_leagues(type: str):
     platform_tables = [
         "market_polymarket",
         "market_btx",
+        "market_kalshi"
         # 后续可添加其他平台表
     ]
     
@@ -107,6 +108,7 @@ async def list_events_by_league(type: str, league: str):
     platform_tables = [
         "market_polymarket",
         "market_btx",
+        "market_kalshi"
         # 后续可添加其他平台表
     ]
 
@@ -207,6 +209,7 @@ async def list_all_market_by_event(request: EventQueryRequest):
     platform_tables = [
         "market_polymarket",
         "market_btx",
+        "market_kalshi"
         # 后续可添加其他平台表
     ]
 
@@ -270,6 +273,31 @@ async def list_all_market_by_event(request: EventQueryRequest):
                             "id": row.market_id
                         })
                 
+                markets_data = [
+                    {"market_type": mtype, "outcomes": outcomes}
+                    for mtype, outcomes in type_groups.items()
+                ]
+            if table_name == "market_kalshi":
+                type_groups = defaultdict(list)
+                for row in rows:
+                    market_type = row.type
+                    # runners 是数组对象，提取 id 字段
+                    runners_data = json.loads(row.runners) if row.runners else []
+                    runners = [item["id"] for item in runners_data]
+                    title = row.display_names.split(" v ")
+                    outcomes = json.loads(row.outcomes) if row.outcomes else []
+                    if row.neg_risk == b'0' or row.neg_risk == b'False':
+                        for idx in range(len(runners)):
+                            type_groups[market_type].append({
+                                "name": title[idx] if len(runners[idx]) == 14 else runners[idx],
+                                "id": row.market_id
+                            })
+                    else:
+                        type_groups[market_type].append({
+                            "name": runners[0],
+                            "id": row.market_id
+                        })
+
                 markets_data = [
                     {"market_type": mtype, "outcomes": outcomes}
                     for mtype, outcomes in type_groups.items()
