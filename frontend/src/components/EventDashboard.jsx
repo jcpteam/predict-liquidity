@@ -59,10 +59,10 @@ export default function EventDashboard({ league, events, loading, onSelectEvent 
             <div
               key={ev.unified_id}
               className="match-card"
-              onClick={() => onSelectEvent(ev.unified_id)}
+              onClick={() => onSelectEvent(ev.unified_id, ev)}
               role="button"
               tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && onSelectEvent(ev.unified_id)}
+              onKeyDown={e => e.key === 'Enter' && onSelectEvent(ev.unified_id, ev)}
             >
               {ev.image && <img src={ev.image} alt="" className="match-card-img" />}
               <div className="match-card-body">

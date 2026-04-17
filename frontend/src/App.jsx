@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { fetchLeagues, fetchLeagueEvents, syncEvents, fetchMarkets, autoMatchAll } from './api'
+import { fetchLeagues, fetchCricketLeagues, fetchLeagueEvents, fetchCricketEvents, syncEvents, fetchMarkets, autoMatchAll } from './api'
 import HomePage from './components/HomePage.jsx'
 import LeagueSidebar from './components/LeagueSidebar.jsx'
 import EventDashboard from './components/EventDashboard.jsx'
 import MarketOverview from './components/MarketOverview.jsx'
+import SportsMarketOverview from './components/SportsMarketOverview.jsx'
 import EventDetail from './components/EventDetail.jsx'
 import './style.css'
 
@@ -23,11 +24,15 @@ export default function App() {
   const [selectedEventName, setSelectedEventName] = useState('')
   const [selectedMarketLabel, setSelectedMarketLabel] = useState(null)
   const [selectedBtxMarketId, setSelectedBtxMarketId] = useState(null)
+  const [currentSport, setCurrentSport] = useState('football')
+  const [selectedEventData, setSelectedEventData] = useState(null)
 
-  const loadLeagues = async () => {
+  const loadLeagues = async (sport) => {
     setLoading(true)
     try {
-      const [lgs, mkts] = await Promise.all([fetchLeagues(), fetchMarkets()])
+      const currentSportToUse = sport || currentSport
+      const fetchFunc = currentSportToUse === 'cricket' ? fetchCricketLeagues : fetchLeagues
+      const [lgs, mkts] = await Promise.all([fetchFunc(), fetchMarkets()])
       setLeagues(lgs)
       setMarkets(mkts.markets || [])
       return lgs
@@ -36,15 +41,32 @@ export default function App() {
 
   const loadEventsForLeague = async (league) => {
     setLoadingEvents(true)
-    try { setEvents(await fetchLeagueEvents(league)) }
+    try {
+      // 根据当前运动类型调用不同接口
+      if (currentSport === 'cricket') {
+        // 从 leagues 中找到对应 league 的 sport 值
+        const leagueData = leagues.find(l => l.name === league)
+        const sportType = leagueData?.sport || 'crkt'
+        setEvents(await fetchCricketEvents(sportType, league))
+      } else {
+        // 足球模块保持原有逻辑
+        setEvents(await fetchLeagueEvents(league))
+      }
+    }
     finally { setLoadingEvents(false) }
   }
 
   const handleSelectSport = (sportId) => {
-    if (sportId === 'football') {
+    if (sportId === 'football' || sportId === 'cricket') {
+      // 清空旧状态
+      setLeagues([])
+      setEvents([])
+      setSelectedLeague(null)
+      
+      setCurrentSport(sportId)
       setView('leagues')
-      loadLeagues().then(lgs => {
-        if (lgs.length > 0 && !selectedLeague) {
+      loadLeagues(sportId).then(lgs => {
+        if (lgs.length > 0) {
           setSelectedLeague(lgs[0].name)
           loadEventsForLeague(lgs[0].name)
         }
@@ -58,9 +80,10 @@ export default function App() {
   }
 
   // Events page → Markets page
-  const handleSelectEvent = (eventId, eventName) => {
+  const handleSelectEvent = (eventId, eventName, eventData) => {
     setSelectedEventId(eventId)
     setSelectedEventName(eventName || '')
+    setSelectedEventData(eventData || null)
     setSelectedMarketLabel(null)
     setView('markets')
   }
@@ -140,12 +163,20 @@ export default function App() {
           <button className="sync-btn back-btn" onClick={handleBack}>← Back to Events</button>
         </header>
         <div className="detail-fullpage">
-          <MarketOverview
-            unifiedId={selectedEventId}
-            displayName={selectedEventName}
-            onSelectMarket={handleSelectMarket}
-            onBack={handleBack}
-          />
+          {currentSport === 'cricket' ? (
+            <SportsMarketOverview
+              eventData={selectedEventData}
+              displayName={selectedEventName}
+              onSelectMarket={handleSelectMarket}
+            />
+          ) : (
+            <MarketOverview
+              unifiedId={selectedEventId}
+              displayName={selectedEventName}
+              onSelectMarket={handleSelectMarket}
+              onBack={handleBack}
+            />
+          )}
         </div>
       </div>
     )
@@ -178,9 +209,8 @@ export default function App() {
           league={selectedLeague}
           events={events}
           loading={loading || loadingEvents}
-          onSelectEvent={(id) => {
-            const ev = events.find(e => e.unified_id === id)
-            handleSelectEvent(id, ev?.display_name || '')
+          onSelectEvent={(id, ev) => {
+            handleSelectEvent(id, ev?.display_name || '', currentSport === 'cricket' ? ev : null)
           }}
         />
       </div>

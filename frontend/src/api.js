@@ -5,8 +5,19 @@ export async function fetchLeagues() {
   return res.json()
 }
 
+export async function fetchCricketLeagues() {
+  const res = await fetch(`${BASE}/crkt/leagues`)
+  return res.json()
+}
+
 export async function fetchLeagueEvents(league) {
   const res = await fetch(`${BASE}/leagues/${encodeURIComponent(league)}/events`)
+  return res.json()
+}
+
+export async function fetchCricketEvents(type, league) {
+  const params = new URLSearchParams({ type, league })
+  const res = await fetch(`${BASE}/events?${params}`)
   return res.json()
 }
 
@@ -49,6 +60,15 @@ export async function fetchOrderBooks(unifiedId, btxMarketId) {
 
 export async function fetchAllMarkets(unifiedId) {
   const res = await fetch(`${BASE}/events/${unifiedId}/all-markets`)
+  return res.json()
+}
+
+export async function fetchSportsAllMarkets(eventData) {
+  const res = await fetch(`${BASE}/all_market`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(eventData)
+  })
   return res.json()
 }
 

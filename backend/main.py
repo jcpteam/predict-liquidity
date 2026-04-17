@@ -64,6 +64,8 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
+import routes.leagues
+app.include_router(routes.leagues.router)
 
 # ── 事件列表 (从数据库加载) ──
 

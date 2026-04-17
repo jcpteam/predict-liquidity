@@ -12,7 +12,7 @@ const CATEGORIES = [
 
 const SPORTS = [
   { id: 'football', name: 'Football', icon: '⚽', desc: 'EPL, La Liga, UCL, Serie A & more', available: true },
-  { id: 'cricket', name: 'Cricket', icon: '🏏', desc: 'IPL, Test Matches, T20 World Cup', available: false },
+  { id: 'cricket', name: 'Cricket', icon: '🏏', desc: 'IPL, Test Matches, T20 World Cup', available: true },
   { id: 'basketball', name: 'NBA', icon: '🏀', desc: 'NBA, EuroLeague, FIBA', available: false },
   { id: 'tennis', name: 'Tennis', icon: '🎾', desc: 'Grand Slams, ATP, WTA', available: false },
   { id: 'baseball', name: 'Baseball', icon: '⚾', desc: 'MLB, NPB, KBO', available: false },
