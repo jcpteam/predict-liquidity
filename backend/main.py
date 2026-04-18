@@ -1086,23 +1086,15 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             if pm_adapter:
                 try:
                     events = await pm_adapter.fetch_event(str(pm_data["event_id"]))
-                    # Filter to only outcomes matching the clicked market type
-                    pm_type = pm_data.get("type", "")
-                    if pm_type and events:
-                        # Polymarket returns all markets under the event.
-                        # Filter by matching event_title or outcome to the market type.
-                        # For neg_risk=0 markets (Match Odds etc), outcomes are team names.
-                        # For neg_risk=1 markets, event_title contains the group item title.
-                        pm_outcomes = pm_data.get("outcomes", [])
-                        if pm_outcomes:
-                            # Match by outcome names from DB
-                            outcome_names = set()
-                            for o in pm_outcomes:
-                                if isinstance(o, str):
-                                    outcome_names.add(o.lower())
-                            filtered = [ev for ev in events
-                                        if (ev.outcome and ev.outcome.lower() in outcome_names)
-                                        or (ev.event_title and ev.event_title.lower() in outcome_names)]
+                    # Filter by token_id: runners field contains the token IDs for this specific market
+                    pm_runners = pm_data.get("runners", [])
+                    if pm_runners and events:
+                        token_ids = set()
+                        for r in pm_runners:
+                            if isinstance(r, str):
+                                token_ids.add(r)
+                        if token_ids:
+                            filtered = [ev for ev in events if ev.token_id in token_ids]
                             if filtered:
                                 events = filtered
                     pm_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
