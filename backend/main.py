@@ -1008,8 +1008,13 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             btx_adapter = registry.get("btx")
             if btx_adapter:
                 try:
-                    events = await btx_adapter.fetch_event(btx_data["market_id"])
+                    events = await asyncio.wait_for(
+                        btx_adapter.fetch_event(btx_data["market_id"]),
+                        timeout=30
+                    )
                     btx_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
+                except asyncio.TimeoutError:
+                    print(f"[cricket] BTX orderbook timeout for {btx_data['market_id']}")
                 except Exception as e:
                     print(f"[cricket] BTX orderbook error: {e}")
 

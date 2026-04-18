@@ -175,6 +175,12 @@ class BTXAdapter(BaseMarketAdapter):
                 "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
                 "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
                 "FOOTBALL_FULL_TIME_CORRECT_SCORE",
+                "CRICKET_MATCH_ODDS",
+                "CRICKET_MATCH_ODDS_WITH_DRAW",
+                "CRICKET_COMPLETED_MATCH",
+                "CRICKET_TIED_MATCH",
+                "CRICKET_INNINGS_SESSION_TOTAL_LINE",
+                "CRICKET_INNINGS_TOTAL_LINE",
             ]
         req = self._pb2.StreamMarketDataRequest(
             market_types_to_stream=market_types,
