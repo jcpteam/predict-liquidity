@@ -190,8 +190,11 @@ def markets_list(cricket_series: list[dict])->list[dict]:
         # 提取时间：优先用 nested markets 的 close_time
         created_time = ""
         markets = ev.get("markets", [])
+        runners = [];
         if markets:
             created_time = markets[0].get("expected_expiration_time", "").replace("T", " ").replace("Z", "")
+            for market in markets:
+                runners.append({"id":market.get("yes_sub_title"),"status":1})
         if not created_time:
             created_time = ev.get("last_updated_ts", "")
 
@@ -207,6 +210,8 @@ def markets_list(cricket_series: list[dict])->list[dict]:
             "sport_id":"crkt",
             "status": 0,
             "start_time": created_time,
+            "runners": str(runners).replace("'","\""),
+            "neg_risk":False
             #"end_time": close_time,
            # "market_tickers": market_tickers,
             #"category": ev.get("category", ""),

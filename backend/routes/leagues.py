@@ -294,7 +294,7 @@ async def list_all_market_by_event(request: EventQueryRequest):
                     runners_data = json.loads(row.runners) if row.runners else []
                     runners = [item["id"] for item in runners_data]
                     title = row.display_names.split(" v ")
-                    outcomes = json.loads(row.outcomes) if row.outcomes else []
+                    #outcomes = json.loads(row.outcomes) if row.outcomes else []
                     if row.neg_risk == b'0' or row.neg_risk == b'False':
                         for idx in range(len(runners)):
                             type_groups[market_type].append({

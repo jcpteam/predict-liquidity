@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { fetchAllMarkets } from '../api'
 
 // const PLATFORMS = ['btx', 'polymarket', 'kalshi', 'betfair','Platform F']
-const PLATFORMS = ['btx', 'polymarket', 'kalshi1']
+const PLATFORMS = ['btx', 'polymarket', 'kalshi11']
 const PLATFORM_CURRENCY = {
   btx: { symbol: '$', code: 'USD' },
   polymarket: { symbol: '', code: 'USDC' },
