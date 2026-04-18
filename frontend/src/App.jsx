@@ -6,6 +6,7 @@ import EventDashboard from './components/EventDashboard.jsx'
 import MarketOverview from './components/MarketOverview.jsx'
 import SportsMarketOverview from './components/SportsMarketOverview.jsx'
 import EventDetail from './components/EventDetail.jsx'
+import CricketOrderbook from './components/CricketOrderbook.jsx'
 import './style.css'
 
 // Views: home → leagues → markets → detail
@@ -24,6 +25,7 @@ export default function App() {
   const [selectedEventName, setSelectedEventName] = useState('')
   const [selectedMarketLabel, setSelectedMarketLabel] = useState(null)
   const [selectedBtxMarketId, setSelectedBtxMarketId] = useState(null)
+  const [clickedPlatform, setClickedPlatform] = useState(null)
   const [currentSport, setCurrentSport] = useState('football')
   const [selectedEventData, setSelectedEventData] = useState(null)
 
@@ -89,9 +91,11 @@ export default function App() {
   }
 
   // Markets page → Detail page (specific btx market)
-  const handleSelectMarket = (marketLabel, btxMarketId) => {
+  const handleSelectMarket = (marketLabel, btxMarketId, clickedPlatform) => {
     setSelectedMarketLabel(marketLabel)
     setSelectedBtxMarketId(btxMarketId || null)
+    // Store clicked platform for cricket orderbook
+    setClickedPlatform(clickedPlatform || null)
     setView('detail')
   }
 
@@ -143,12 +147,20 @@ export default function App() {
           <button className="sync-btn back-btn" onClick={handleBack}>← Back to Markets</button>
         </header>
         <div className="detail-fullpage">
-          <EventDetail
-            unifiedId={selectedEventId}
-            markets={markets}
-            btxMarketId={selectedBtxMarketId}
-            onMappingChange={() => { if (selectedLeague) loadEventsForLeague(selectedLeague) }}
-          />
+          {currentSport === 'cricket' && clickedPlatform && selectedBtxMarketId ? (
+            <CricketOrderbook
+              platform={clickedPlatform}
+              marketId={selectedBtxMarketId}
+              onBack={handleBack}
+            />
+          ) : (
+            <EventDetail
+              unifiedId={selectedEventId}
+              markets={markets}
+              btxMarketId={selectedBtxMarketId}
+              onMappingChange={() => { if (selectedLeague) loadEventsForLeague(selectedLeague) }}
+            />
+          )}
         </div>
       </div>
     )

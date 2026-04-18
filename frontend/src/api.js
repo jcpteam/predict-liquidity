@@ -63,6 +63,11 @@ export async function fetchAllMarkets(unifiedId) {
   return res.json()
 }
 
+export async function fetchCricketOrderbook(platform, marketId) {
+  const res = await fetch(`${BASE}/cricket/markets/${platform}/${encodeURIComponent(marketId)}/orderbook`)
+  return res.json()
+}
+
 export async function fetchSportsAllMarkets(eventData) {
   const res = await fetch(`${BASE}/all_market`, {
     method: 'POST',
