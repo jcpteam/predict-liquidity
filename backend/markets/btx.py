@@ -320,14 +320,15 @@ class BTXAdapter(BaseMarketAdapter):
         "CRICKET_INNINGS_TOTAL_LINE",
     ]
 
-    async def fetch_cricket_event(self, market_id: str) -> list[MarketEvent]:
-        """Fetch orderbook for a cricket market using cricket-specific market types.
-        Waits for initial data then accumulates for 3s to get fuller depth.
+    async def fetch_cricket_event(self, market_id: str, grpc_market_type: str = None) -> list[MarketEvent]:
+        """Fetch orderbook for a cricket market.
+        If grpc_market_type is provided, only request that specific type for faster response.
         """
         try:
             await self._load_runner_names()
+            market_types = [grpc_market_type] if grpc_market_type else self.CRICKET_MARKET_TYPES
             stream = await self.stream_market_data(
-                market_types=self.CRICKET_MARKET_TYPES,
+                market_types=market_types,
                 stream_prices=True,
             )
             if stream is None:

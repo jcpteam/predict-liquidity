@@ -1025,8 +1025,10 @@ async def get_cricket_orderbook(platform: str, market_id: str, market_type: str 
             btx_adapter = registry.get("btx")
             if btx_adapter:
                 try:
+                    # Pass specific gRPC market_type for faster, targeted stream
+                    btx_grpc_type = btx_data.get("market_type", "")
                     events = await asyncio.wait_for(
-                        btx_adapter.fetch_cricket_event(btx_data["market_id"]),
+                        btx_adapter.fetch_cricket_event(btx_data["market_id"], grpc_market_type=btx_grpc_type or None),
                         timeout=30
                     )
                     btx_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
