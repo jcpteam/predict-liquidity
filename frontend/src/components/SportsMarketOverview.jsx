@@ -107,7 +107,7 @@ function SportsPlatformColumn({ platform, markets, sortedMarketTypes, onSelectMa
               <button
                 type="button"
                 className="mkt-col-subtitle"
-                onClick={() => onSelectMarket?.(market.market_type, null)}
+                onClick={() => onSelectMarket?.(market.market_type, market.market_id, platform)}
               >
                 {market.market_type}
               </button>

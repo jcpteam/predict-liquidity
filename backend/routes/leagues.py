@@ -229,8 +229,11 @@ async def list_all_market_by_event(request: EventQueryRequest):
             if table_name == "market_polymarket":
                 # 按 market_type 收集所有 outcomes
                 type_groups = defaultdict(list)
+                type_market_ids_pm = {}  # market_type -> first market_id
                 for row in rows:
                         market_type = row.type
+                        if market_type not in type_market_ids_pm:
+                            type_market_ids_pm[market_type] = row.market_id
                         runners = json.loads(row.runners) if row.runners else []
                         # neg_risk 是 bytes 类型，b'0' 表示普通市场
                         if row.neg_risk == b'0' or row.neg_risk == b'False':
@@ -247,15 +250,18 @@ async def list_all_market_by_event(request: EventQueryRequest):
                                 "name": row.item_title,
                                 "id": runners[0] if runners else None
                             })
-                         # 转换为 markets_data 格式
-                        markets_data = [
-                           {"market_type": mtype, "outcomes": outcomes}
-                            for mtype, outcomes in type_groups.items()
-                             ]
+                # 转换为 markets_data 格式
+                markets_data = [
+                    {"market_type": mtype, "market_id": type_market_ids_pm.get(mtype, ""), "outcomes": outcomes}
+                    for mtype, outcomes in type_groups.items()
+                ]
             if table_name == "market_btx":
                 type_groups = defaultdict(list)
+                type_market_ids = {}  # market_type -> first market_id
                 for row in rows:
                     market_type = row.type
+                    if market_type not in type_market_ids:
+                        type_market_ids[market_type] = row.market_id
                     # runners 是数组对象，提取 id 字段
                     runners_data = json.loads(row.runners) if row.runners else []
                     runners = [item["id"] for item in runners_data]
@@ -274,13 +280,16 @@ async def list_all_market_by_event(request: EventQueryRequest):
                         })
                 
                 markets_data = [
-                    {"market_type": mtype, "outcomes": outcomes}
+                    {"market_type": mtype, "market_id": type_market_ids.get(mtype, ""), "outcomes": outcomes}
                     for mtype, outcomes in type_groups.items()
                 ]
             if table_name == "market_kalshi":
                 type_groups = defaultdict(list)
+                type_market_ids_k = {}  # market_type -> first market_id
                 for row in rows:
                     market_type = row.type
+                    if market_type not in type_market_ids_k:
+                        type_market_ids_k[market_type] = row.market_id
                     # runners 是数组对象，提取 id 字段
                     runners_data = json.loads(row.runners) if row.runners else []
                     runners = [item["id"] for item in runners_data]
@@ -299,7 +308,7 @@ async def list_all_market_by_event(request: EventQueryRequest):
                         })
 
                 markets_data = [
-                    {"market_type": mtype, "outcomes": outcomes}
+                    {"market_type": mtype, "market_id": type_market_ids_k.get(mtype, ""), "outcomes": outcomes}
                     for mtype, outcomes in type_groups.items()
                 ]
             all_markets.append({

@@ -908,6 +908,146 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
                 await asyncio.sleep(5)
 
 
+# ── Cricket API ──
+
+@app.get("/api/cricket/markets/{platform}/{market_id}/orderbook")
+async def get_cricket_orderbook(platform: str, market_id: str):
+    """Get orderbook for a specific cricket market.
+    Also fetches mapped markets from other platforms via market_mappings.
+    """
+    import json as _json
+    from sqlalchemy import text as _text
+    from database import async_session as _cricket_session
+
+    async with _cricket_session() as session:
+        # Get the clicked market info
+        table = f"market_{platform}" if platform in ("btx", "polymarket", "kalshi") else None
+        if not table:
+            raise HTTPException(400, f"Unknown platform: {platform}")
+
+        row = (await session.execute(
+            _text(f"SELECT * FROM {table} WHERE market_id = :mid"), {"mid": market_id}
+        )).mappings().first()
+        if not row:
+            raise HTTPException(404, "Market not found")
+
+        result = {"platform": platform, "market_id": market_id, "markets": {}}
+        event_name = row.get("display_names", "")
+        event_id = row.get("event_id", "")
+
+        # Add the clicked platform's data
+        runners = row.get("runners")
+        outcomes = row.get("outcomes")
+        if isinstance(runners, str):
+            try: runners = _json.loads(runners)
+            except: runners = []
+        if isinstance(outcomes, str):
+            try: outcomes = _json.loads(outcomes)
+            except: outcomes = []
+
+        result["markets"][platform] = {
+            "market_id": market_id,
+            "event_id": event_id,
+            "display_name": event_name,
+            "market_type": row.get("market_type", ""),
+            "type": row.get("type", ""),
+            "runners": runners or [],
+            "outcomes": outcomes or [],
+        }
+
+        # Check market_mappings for cross-platform mappings
+        mappings = (await session.execute(
+            _text("SELECT market_name, market_event_id FROM market_mappings WHERE unified_id = :uid"),
+            {"uid": event_id}
+        )).mappings().all()
+
+        # Also try mapping by market_id as unified_id
+        if not mappings:
+            mappings = (await session.execute(
+                _text("SELECT market_name, market_event_id FROM market_mappings WHERE unified_id = :uid"),
+                {"uid": market_id}
+            )).mappings().all()
+
+        # Fetch mapped markets from other platforms
+        for m in mappings:
+            mname = m["market_name"]
+            meid = m["market_event_id"]
+            if mname == platform:
+                continue
+            mtable = f"market_{mname}" if mname in ("btx", "polymarket", "kalshi") else None
+            if not mtable:
+                continue
+            try:
+                mrow = (await session.execute(
+                    _text(f"SELECT * FROM {mtable} WHERE market_id = :mid"), {"mid": meid}
+                )).mappings().first()
+                if mrow:
+                    mr = mrow.get("runners")
+                    mo = mrow.get("outcomes")
+                    if isinstance(mr, str):
+                        try: mr = _json.loads(mr)
+                        except: mr = []
+                    if isinstance(mo, str):
+                        try: mo = _json.loads(mo)
+                        except: mo = []
+                    result["markets"][mname] = {
+                        "market_id": meid,
+                        "event_id": mrow.get("event_id", ""),
+                        "display_name": mrow.get("display_names", ""),
+                        "market_type": mrow.get("market_type", ""),
+                        "type": mrow.get("type", ""),
+                        "runners": mr or [],
+                        "outcomes": mo or [],
+                    }
+            except Exception as e:
+                print(f"[cricket] Error fetching {mname}/{meid}: {e}")
+
+        # Fetch real-time orderbook data for BTX if available
+        btx_data = result["markets"].get("btx")
+        if btx_data:
+            btx_adapter = registry.get("btx")
+            if btx_adapter:
+                try:
+                    events = await asyncio.wait_for(
+                        btx_adapter.fetch_cricket_event(btx_data["market_id"]),
+                        timeout=30
+                    )
+                    btx_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
+                except asyncio.TimeoutError:
+                    print(f"[cricket] BTX orderbook timeout for {btx_data['market_id']}")
+                except Exception as e:
+                    print(f"[cricket] BTX orderbook error: {e}")
+
+        # Fetch real-time orderbook for Polymarket
+        pm_data = result["markets"].get("polymarket")
+        if pm_data:
+            pm_adapter = registry.get("polymarket")
+            if pm_adapter:
+                try:
+                    events = await pm_adapter.fetch_event(str(pm_data["event_id"]))
+                    pm_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
+                except Exception as e:
+                    print(f"[cricket] PM orderbook error: {e}")
+
+        # Fetch real-time orderbook for Kalshi
+        kalshi_data = result["markets"].get("kalshi")
+        if kalshi_data:
+            kalshi_adapter = registry.get("kalshi")
+            if kalshi_adapter:
+                try:
+                    events = await kalshi_adapter.fetch_event(kalshi_data["market_id"])
+                    kalshi_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
+                except Exception as e:
+                    print(f"[cricket] Kalshi orderbook error: {e}")
+
+        return {
+            "event_name": event_name,
+            "event_id": event_id,
+            "sport": "cricket",
+            "markets": result["markets"],
+        }
+
+
 # ── 静态文件 ──
 for candidate in [
     Path(__file__).parent / "frontend_dist",
