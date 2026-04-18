@@ -1002,6 +1002,54 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             except Exception as e:
                 print(f"[cricket] Error fetching {mname}/{meid}: {e}")
 
+        # Fallback: if no cross-platform data found via mappings,
+        # try matching by display_names + start_time across other platform tables
+        start_time = row.get("start_time")
+        market_type = row.get("type", "")
+        other_platforms = [p for p in ("btx", "polymarket", "kalshi") if p != platform and p not in result["markets"]]
+        for op in other_platforms:
+            otable = f"market_{op}"
+            try:
+                # Match by display_names and start_time (same day)
+                if start_time:
+                    orows = (await session.execute(
+                        _text(f"""SELECT * FROM {otable}
+                            WHERE display_names = :dn
+                            AND DATE(start_time) = DATE(:st)
+                            AND sport_id = 'crkt'
+                            LIMIT 1"""),
+                        {"dn": event_name, "st": start_time}
+                    )).mappings().all()
+                else:
+                    orows = (await session.execute(
+                        _text(f"""SELECT * FROM {otable}
+                            WHERE display_names = :dn
+                            AND sport_id = 'crkt'
+                            LIMIT 1"""),
+                        {"dn": event_name}
+                    )).mappings().all()
+                if orows:
+                    orow = orows[0]
+                    mr = orow.get("runners")
+                    mo = orow.get("outcomes")
+                    if isinstance(mr, str):
+                        try: mr = _json.loads(mr)
+                        except: mr = []
+                    if isinstance(mo, str):
+                        try: mo = _json.loads(mo)
+                        except: mo = []
+                    result["markets"][op] = {
+                        "market_id": orow.get("market_id", ""),
+                        "event_id": orow.get("event_id", ""),
+                        "display_name": orow.get("display_names", ""),
+                        "market_type": orow.get("market_type", ""),
+                        "type": orow.get("type", ""),
+                        "runners": mr or [],
+                        "outcomes": mo or [],
+                    }
+            except Exception as e:
+                print(f"[cricket] Fallback lookup {op} error: {e}")
+
         # Fetch real-time orderbook data for BTX if available
         btx_data = result["markets"].get("btx")
         if btx_data:
