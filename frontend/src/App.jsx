@@ -147,10 +147,10 @@ export default function App() {
           <button className="sync-btn back-btn" onClick={handleBack}>← Back to Markets</button>
         </header>
         <div className="detail-fullpage">
-          {currentSport === 'cricket' && clickedPlatform && selectedBtxMarketId ? (
+          {currentSport === 'cricket' ? (
             <CricketOrderbook
-              platform={clickedPlatform}
-              marketId={selectedBtxMarketId}
+              platform={clickedPlatform || 'btx'}
+              marketId={selectedBtxMarketId || selectedEventId}
               onBack={handleBack}
             />
           ) : (
