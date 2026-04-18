@@ -188,7 +188,12 @@ function CricketLiquiditySummary({ markets }) {
           </tr>
           <tr>
             <td>Matched Liquidity</td>
-            {PLATFORM_ORDER.map(m => <td key={m} className="matched-val">{stats[m].matchedLiq != null ? stats[m].matchedLiq.toFixed(0) : '—'}</td>)}
+            {PLATFORM_ORDER.map(m => {
+              const v = stats[m].matchedLiq
+              if (v == null) return <td key={m} className="matched-val">—</td>
+              const sym = m === 'polymarket' ? 'USDC ' : '$'
+              return <td key={m} className="matched-val">{sym}{v.toFixed(0)}</td>
+            })}
           </tr>
           <tr>
             <td title="Spread = Σ Last Price per outcome. Fair market = 100¢">Spread</td>
