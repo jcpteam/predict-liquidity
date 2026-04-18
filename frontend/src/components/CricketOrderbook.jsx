@@ -20,6 +20,57 @@ function getSpreadPrice(ev, mname) {
   return getBestBid(ev)
 }
 
+function normLabel(s) {
+  if (!s) return ''
+  return s.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function labelSimilarity(a, b) {
+  if (!a || !b) return 0
+  const na = normLabel(a), nb = normLabel(b)
+  if (na === nb) return 1
+  if (na.includes(nb) || nb.includes(na)) return 0.85
+  const wa = new Set(na.split(' ')), wb = new Set(nb.split(' '))
+  const inter = [...wa].filter(w => wb.has(w)).length
+  const union = new Set([...wa, ...wb]).size
+  return union > 0 ? inter / union : 0
+}
+
+/**
+ * Build outcome columns from cricket orderbook data.
+ * Structure: markets[platform].orderbook[] — each entry has outcome/event_title + order_book
+ * We align outcomes across platforms by name similarity (same as football).
+ */
+function buildOutcomeColumns(markets) {
+  // Find canonical outcomes from first platform with orderbook data
+  const canonicalOutcomes = []
+  for (const mname of PLATFORM_ORDER) {
+    const ob = markets[mname]?.orderbook || []
+    if (ob.length === 0) continue
+    for (const ev of ob) {
+      canonicalOutcomes.push(ev.outcome || ev.event_title || `Outcome`)
+    }
+    break
+  }
+  if (canonicalOutcomes.length === 0) return []
+
+  return canonicalOutcomes.map(label => {
+    const col = { outcome: label, markets: {} }
+    for (const mname of PLATFORM_ORDER) {
+      const ob = markets[mname]?.orderbook || []
+      if (ob.length === 0) { col.markets[mname] = null; continue }
+      let bestEv = null, bestScore = -1
+      for (const ev of ob) {
+        const evLabel = ev.outcome || ev.event_title || ''
+        const sim = labelSimilarity(label, evLabel)
+        if (sim > bestScore) { bestScore = sim; bestEv = ev }
+      }
+      col.markets[mname] = bestScore >= 0.2 ? bestEv : null
+    }
+    return col
+  })
+}
+
 export default function CricketOrderbook({ platform, marketId, onBack }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,6 +88,7 @@ export default function CricketOrderbook({ platform, marketId, onBack }) {
 
   const markets = data.markets || {}
   const eventName = data.event_name || ''
+  const columns = buildOutcomeColumns(markets)
 
   return (
     <div className="detail-page">
@@ -50,75 +102,70 @@ export default function CricketOrderbook({ platform, marketId, onBack }) {
         </div>
       </div>
 
-      {/* Show each platform's orderbook */}
-      <div className="outcome-columns">
-        {PLATFORM_ORDER.map(pname => {
-          const mkt = markets[pname]
-          if (!mkt) return (
-            <div key={pname} className="outcome-col">
-              <div className="outcome-col-header">{PLATFORM_DISPLAY[pname] || pname.toUpperCase()}</div>
-              <div className="outcome-market-cell">
-                <div className="cell-nodata">No Data</div>
-              </div>
-            </div>
-          )
+      {columns.length === 0 && <p className="empty">No orderbook data</p>}
 
-          const ob = mkt.orderbook || []
-          const hasOb = ob.length > 0
+      {/* Outcome columns grid — same layout as football: columns=outcomes, rows=platforms */}
+      {columns.length > 0 && (
+        <div className="outcome-columns">
+          {columns.map(col => (
+            <div key={col.outcome} className="outcome-col-header">{col.outcome}</div>
+          ))}
 
-          return (
-            <div key={pname} className="outcome-col">
-              <div className="outcome-col-header">
-                {PLATFORM_DISPLAY[pname] || pname.toUpperCase()}
-                <span className="market-row-meta" style={{marginLeft: 8, fontSize: 11}}>
-                  {mkt.type || mkt.market_type || ''}
-                </span>
-              </div>
-              {hasOb ? ob.map((ev, i) => (
-                <div key={i} className="outcome-market-cell">
-                  <div className="cell-market-label">{ev.outcome || ev.event_title || `Outcome ${i+1}`}</div>
-                  <div className="cell-ob">
-                    <div className="cell-meta">
-                      {ev.last_price != null && <span className="price">
-                        {showOdds && ev.last_price > 0 ? (1/ev.last_price).toFixed(2) : `${(ev.last_price*100).toFixed(1)}¢`}
-                      </span>}
-                      {getBestBid(ev) != null && <span className="cell-bid">
-                        Bid: {showOdds && getBestBid(ev) > 0 ? (1/getBestBid(ev)).toFixed(2) : `${(getBestBid(ev)*100).toFixed(1)}¢`}
-                      </span>}
-                      {getBestAsk(ev) != null && <span className="cell-ask">
-                        Ask: {showOdds && getBestAsk(ev) > 0 ? (1/getBestAsk(ev)).toFixed(2) : `${(getBestAsk(ev)*100).toFixed(1)}¢`}
-                      </span>}
+          {PLATFORM_ORDER.map(mname => (
+            columns.map(col => {
+              const ev = col.markets[mname]
+              return (
+                <div key={`${col.outcome}-${mname}`} className="outcome-market-cell">
+                  <div className="cell-market-label">{(PLATFORM_DISPLAY[mname] || mname).toUpperCase()}</div>
+                  {!ev || !ev.order_book ? (
+                    <div className="cell-nodata">No Data</div>
+                  ) : (
+                    <div className="cell-ob">
+                      <ShowSubHeader ev={ev} mname={mname} showOdds={showOdds} />
+                      <OrderBookChart orderBook={ev.order_book} showOdds={showOdds} marketName={mname} />
                     </div>
-                    {ev.order_book && <OrderBookChart orderBook={ev.order_book} showOdds={showOdds} marketName={pname} />}
-                  </div>
+                  )}
                 </div>
-              )) : (
-                <div className="outcome-market-cell">
-                  <div className="cell-market-label">{mkt.display_name}</div>
-                  <div className="cell-nodata">
-                    {mkt.runners?.length > 0
-                      ? `${mkt.runners.length} runner(s) — no live orderbook`
-                      : 'No orderbook data'}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              )
+            })
+          ))}
+        </div>
+      )}
 
-      <CricketLiquiditySummary markets={markets} />
+      {columns.length > 0 && <CricketLiquiditySummary columns={columns} />}
     </div>
   )
 }
 
-function CricketLiquiditySummary({ markets }) {
+function ShowSubHeader({ ev, mname, showOdds }) {
+  const isExchange = mname === 'btx'
+  const fmtPrice = (p) => {
+    if (p == null) return '—'
+    if (showOdds && isExchange && p > 0) return (1 / p).toFixed(2)
+    return (p * 100).toFixed(1) + '¢'
+  }
+  const bestBid = getBestBid(ev)
+  const bestAsk = getBestAsk(ev)
+  let displayPrice
+  if (mname === 'btx' && bestAsk != null) displayPrice = bestAsk
+  else if (mname === 'polymarket' && bestAsk != null) displayPrice = bestAsk
+  else displayPrice = ev.last_price ?? bestBid
+
+  return (
+    <div className="cell-meta">
+      <span className="price">{fmtPrice(displayPrice)}</span>
+      {bestBid != null && <span className="cell-bid">Bid: {fmtPrice(bestBid)}</span>}
+      {bestAsk != null && <span className="cell-ask">Ask: {fmtPrice(bestAsk)}</span>}
+    </div>
+  )
+}
+
+function CricketLiquiditySummary({ columns }) {
   const stats = {}
   for (const mname of PLATFORM_ORDER) {
     let availLiq = 0, availVol = 0, matchedLiq = 0, hasMatched = false, spreadSum = 0, spreadCount = 0
-    const mkt = markets[mname]
-    const ob = mkt?.orderbook || []
-    for (const ev of ob) {
+    for (const col of columns) {
+      const ev = col.markets[mname]
       if (ev?.order_book) {
         const bids = ev.order_book.bids || []
         const asks = ev.order_book.asks || []
