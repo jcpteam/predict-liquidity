@@ -20,30 +20,31 @@ function getSpreadPrice(ev, mname) {
   return getBestBid(ev)
 }
 
-export default function CricketOrderbook({ platform, marketId }) {
+export default function CricketOrderbook({ platform, marketId, marketType }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showOdds, setShowOdds] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    fetchCricketOrderbook(platform, marketId)
+    fetchCricketOrderbook(platform, marketId, marketType)
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [platform, marketId])
+  }, [platform, marketId, marketType])
 
   if (loading) return <div className="detail-page"><p className="empty">Loading orderbook...</p></div>
   if (!data) return <div className="detail-page"><p className="empty">No data</p></div>
 
   const markets = data.markets || {}
   const eventName = data.event_name || ''
+  const displayMarketType = data.market_type || marketType || ''
 
   return (
     <div className="detail-page">
       <div className="detail-title-bar">
         <h2>{eventName}</h2>
         <div className="detail-title-meta">
-          <span className="detail-time">🏏 Cricket</span>
+          <span className="detail-time">🏏 Cricket{displayMarketType ? ` — ${displayMarketType}` : ''}</span>
           <button className="btn-toggle-odds" onClick={() => setShowOdds(!showOdds)}>
             {showOdds ? 'Show Predict Format' : 'Show Raw Data'}
           </button>

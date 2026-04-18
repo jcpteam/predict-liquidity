@@ -911,9 +911,9 @@ async def _btx_grpc_stream(websocket: WebSocket, mapping, btx_adapter, stop_even
 # ── Cricket API ──
 
 @app.get("/api/cricket/markets/{platform}/{market_id}/orderbook")
-async def get_cricket_orderbook(platform: str, market_id: str):
+async def get_cricket_orderbook(platform: str, market_id: str, market_type: str = ""):
     """Get orderbook for a specific cricket market.
-    Also fetches mapped markets from other platforms via market_mappings.
+    Also fetches the same market_type from other platforms via display_names matching.
     """
     import json as _json
     from sqlalchemy import text as _text
@@ -934,6 +934,8 @@ async def get_cricket_orderbook(platform: str, market_id: str):
         result = {"platform": platform, "market_id": market_id, "markets": {}}
         event_name = row.get("display_names", "")
         event_id = row.get("event_id", "")
+        start_time = row.get("start_time")
+        clicked_type = market_type or row.get("type", "") or ""
 
         # Add the clicked platform's data
         runners = row.get("runners")
@@ -955,91 +957,44 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             "outcomes": outcomes or [],
         }
 
-        # Check market_mappings for cross-platform mappings
-        mappings = (await session.execute(
-            _text("SELECT market_name, market_event_id FROM market_mappings WHERE unified_id = :uid"),
-            {"uid": event_id}
-        )).mappings().all()
+        # Find matching market on other platforms by display_names + market_type
+        name_variants = [event_name]
+        if " v " in event_name:
+            parts = event_name.split(" v ", 1)
+            name_variants.append(f"{parts[1]} v {parts[0]}")
 
-        # Also try mapping by market_id as unified_id
-        if not mappings:
-            mappings = (await session.execute(
-                _text("SELECT market_name, market_event_id FROM market_mappings WHERE unified_id = :uid"),
-                {"uid": market_id}
-            )).mappings().all()
-
-        # Fetch mapped markets from other platforms
-        for m in mappings:
-            mname = m["market_name"]
-            meid = m["market_event_id"]
-            if mname == platform:
-                continue
-            mtable = f"market_{mname}" if mname in ("btx", "polymarket", "kalshi") else None
-            if not mtable:
-                continue
-            try:
-                mrow = (await session.execute(
-                    _text(f"SELECT * FROM {mtable} WHERE market_id = :mid"), {"mid": meid}
-                )).mappings().first()
-                if mrow:
-                    mr = mrow.get("runners")
-                    mo = mrow.get("outcomes")
-                    if isinstance(mr, str):
-                        try: mr = _json.loads(mr)
-                        except: mr = []
-                    if isinstance(mo, str):
-                        try: mo = _json.loads(mo)
-                        except: mo = []
-                    result["markets"][mname] = {
-                        "market_id": meid,
-                        "event_id": mrow.get("event_id", ""),
-                        "display_name": mrow.get("display_names", ""),
-                        "market_type": mrow.get("market_type", ""),
-                        "type": mrow.get("type", ""),
-                        "runners": mr or [],
-                        "outcomes": mo or [],
-                    }
-            except Exception as e:
-                print(f"[cricket] Error fetching {mname}/{meid}: {e}")
-
-        # Fallback: if no cross-platform data found via mappings,
-        # try matching by display_names + start_time across other platform tables
-        start_time = row.get("start_time")
-        market_type = row.get("type", "")
-        other_platforms = [p for p in ("btx", "polymarket", "kalshi") if p != platform and p not in result["markets"]]
+        other_platforms = [p for p in ("btx", "polymarket", "kalshi") if p != platform]
         for op in other_platforms:
             otable = f"market_{op}"
             try:
-                # Match by display_names and start_time (same day)
-                # Also try reversed team order (A v B → B v A)
-                name_variants = [event_name]
-                if " v " in event_name:
-                    parts = event_name.split(" v ", 1)
-                    name_variants.append(f"{parts[1]} v {parts[0]}")
-
                 orow_found = None
                 for variant in name_variants:
                     if orow_found:
                         break
-                    if start_time:
+                    # First try: match by display_names + type (exact market type)
+                    if clicked_type and start_time:
                         orows = (await session.execute(
                             _text(f"""SELECT * FROM {otable}
                                 WHERE display_names LIKE :dn
+                                AND type = :mtype
                                 AND DATE(start_time) = DATE(:st)
                                 AND sport_id = 'crkt'
                                 LIMIT 1"""),
-                            {"dn": f"{variant}%", "st": start_time}
+                            {"dn": f"{variant}%", "mtype": clicked_type, "st": start_time}
                         )).mappings().all()
-                    else:
+                        if orows:
+                            orow_found = orows[0]
+                    elif clicked_type:
                         orows = (await session.execute(
                             _text(f"""SELECT * FROM {otable}
                                 WHERE display_names LIKE :dn
+                                AND type = :mtype
                                 AND sport_id = 'crkt'
                                 LIMIT 1"""),
-                            {"dn": f"{variant}%"}
+                            {"dn": f"{variant}%", "mtype": clicked_type}
                         )).mappings().all()
-                    if orows:
-                        orow_found = orows[0]
+                        if orows:
+                            orow_found = orows[0]
 
                 if orow_found:
                     orow = orow_found
@@ -1061,9 +1016,9 @@ async def get_cricket_orderbook(platform: str, market_id: str):
                         "outcomes": mo or [],
                     }
             except Exception as e:
-                print(f"[cricket] Fallback lookup {op} error: {e}")
+                print(f"[cricket] Lookup {op} for type '{clicked_type}' error: {e}")
 
-        # Fetch real-time orderbook data for BTX if available
+        # Fetch real-time orderbook data for BTX
         btx_data = result["markets"].get("btx")
         if btx_data:
             btx_adapter = registry.get("btx")
@@ -1086,7 +1041,7 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             if pm_adapter:
                 try:
                     events = await pm_adapter.fetch_event(str(pm_data["event_id"]))
-                    # Filter by token_id: runners field contains the token IDs for this specific market
+                    # Filter by token_id from runners field
                     pm_runners = pm_data.get("runners", [])
                     if pm_runners and events:
                         token_ids = set()
@@ -1116,6 +1071,7 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             "event_name": event_name,
             "event_id": event_id,
             "sport": "cricket",
+            "market_type": clicked_type,
             "markets": result["markets"],
         }
 

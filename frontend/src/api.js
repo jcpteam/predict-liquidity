@@ -63,8 +63,9 @@ export async function fetchAllMarkets(unifiedId) {
   return res.json()
 }
 
-export async function fetchCricketOrderbook(platform, marketId) {
-  const res = await fetch(`${BASE}/cricket/markets/${platform}/${encodeURIComponent(marketId)}/orderbook`)
+export async function fetchCricketOrderbook(platform, marketId, marketType) {
+  const params = marketType ? `?market_type=${encodeURIComponent(marketType)}` : ''
+  const res = await fetch(`${BASE}/cricket/markets/${platform}/${encodeURIComponent(marketId)}/orderbook${params}`)
   return res.json()
 }
 

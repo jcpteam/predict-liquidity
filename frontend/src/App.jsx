@@ -151,6 +151,7 @@ export default function App() {
             <CricketOrderbook
               platform={clickedPlatform || 'btx'}
               marketId={selectedBtxMarketId || selectedEventId}
+              marketType={selectedMarketLabel || ''}
               onBack={handleBack}
             />
           ) : (
