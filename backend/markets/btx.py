@@ -164,7 +164,7 @@ class BTXAdapter(BaseMarketAdapter):
         except Exception as e:
             print(f"[btx] Failed to load runner names: {e}")
 
-    async def stream_market_data(self, market_types=None, stream_prices=True, stream_ref_data=False):
+    async def stream_market_data(self, market_types=None, stream_prices=True, stream_ref_data=False, disable_synthetic=True):
         """Open StreamMarketData gRPC stream"""
         await self._ensure_token()
         await self._ensure_channel()
@@ -184,7 +184,7 @@ class BTXAdapter(BaseMarketAdapter):
             stream_prices_after_timestamp=0,
             stream_ref_data=stream_ref_data,
             stream_ref_data_after_timestamp=0,
-            disable_synthetic_prices=True,
+            disable_synthetic_prices=disable_synthetic,
             market_prices_choice=2,
         )
         return self._stub.StreamMarketData(req, metadata=self._grpc_metadata())
@@ -330,6 +330,7 @@ class BTXAdapter(BaseMarketAdapter):
             stream = await self.stream_market_data(
                 market_types=market_types,
                 stream_prices=True,
+                disable_synthetic=False,
             )
             if stream is None:
                 return []
