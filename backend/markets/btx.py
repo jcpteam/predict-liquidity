@@ -175,12 +175,6 @@ class BTXAdapter(BaseMarketAdapter):
                 "FOOTBALL_FULL_TIME_ASIAN_HANDICAP",
                 "FOOTBALL_FULL_TIME_ASIAN_HANDICAP_TOTAL_GOALS",
                 "FOOTBALL_FULL_TIME_CORRECT_SCORE",
-                "CRICKET_MATCH_ODDS",
-                "CRICKET_MATCH_ODDS_WITH_DRAW",
-                "CRICKET_COMPLETED_MATCH",
-                "CRICKET_TIED_MATCH",
-                "CRICKET_INNINGS_SESSION_TOTAL_LINE",
-                "CRICKET_INNINGS_TOTAL_LINE",
             ]
         req = self._pb2.StreamMarketDataRequest(
             market_types_to_stream=market_types,
@@ -306,6 +300,49 @@ class BTXAdapter(BaseMarketAdapter):
 
     async def search_soccer_events(self, query: str = "") -> list[dict]:
         return []
+
+    # ── Cricket-specific methods ──
+
+    CRICKET_MARKET_TYPES = [
+        "CRICKET_MATCH_ODDS",
+        "CRICKET_MATCH_ODDS_WITH_DRAW",
+        "CRICKET_COMPLETED_MATCH",
+        "CRICKET_TIED_MATCH",
+        "CRICKET_INNINGS_SESSION_TOTAL_LINE",
+        "CRICKET_INNINGS_TOTAL_LINE",
+    ]
+
+    async def fetch_cricket_event(self, market_id: str) -> list[MarketEvent]:
+        """Fetch orderbook for a cricket market using cricket-specific market types."""
+        try:
+            await self._load_runner_names()
+            stream = await self.stream_market_data(
+                market_types=self.CRICKET_MARKET_TYPES,
+                stream_prices=True,
+            )
+            if stream is None:
+                return []
+            import time
+            t0 = time.time()
+            best_events = []
+            async for msg in stream:
+                if time.time() - t0 > 30:
+                    break
+                if msg.prices and msg.prices.market_prices:
+                    parsed = self.parse_price_message(msg.prices)
+                    if market_id in parsed:
+                        events = parsed[market_id]
+                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
+                        if has_data:
+                            stream.cancel()
+                            return events
+                        elif not best_events:
+                            best_events = events
+            stream.cancel()
+            return best_events
+        except Exception as e:
+            print(f"[btx] fetch_cricket_event error: {e}")
+            return []
 
     async def close(self):
         if self._channel:

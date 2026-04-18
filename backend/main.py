@@ -1009,7 +1009,7 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             if btx_adapter:
                 try:
                     events = await asyncio.wait_for(
-                        btx_adapter.fetch_event(btx_data["market_id"]),
+                        btx_adapter.fetch_cricket_event(btx_data["market_id"]),
                         timeout=30
                     )
                     btx_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
