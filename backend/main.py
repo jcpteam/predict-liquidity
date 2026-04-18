@@ -966,35 +966,36 @@ async def get_cricket_orderbook(platform: str, market_id: str, market_type: str 
         other_platforms = [p for p in ("btx", "polymarket", "kalshi") if p != platform]
         for op in other_platforms:
             otable = f"market_{op}"
+            if not clicked_type:
+                # No market type specified — skip, show No Data
+                continue
             try:
                 orow_found = None
                 for variant in name_variants:
                     if orow_found:
                         break
-                    # First try: match by display_names + type (exact market type)
-                    if clicked_type and start_time:
+                    # Match by display_names + type (case-insensitive)
+                    if start_time:
                         orows = (await session.execute(
                             _text(f"""SELECT * FROM {otable}
                                 WHERE display_names LIKE :dn
-                                AND type = :mtype
+                                AND LOWER(type) = LOWER(:mtype)
                                 AND DATE(start_time) = DATE(:st)
                                 AND sport_id = 'crkt'
                                 LIMIT 1"""),
                             {"dn": f"{variant}%", "mtype": clicked_type, "st": start_time}
                         )).mappings().all()
-                        if orows:
-                            orow_found = orows[0]
-                    elif clicked_type:
+                    else:
                         orows = (await session.execute(
                             _text(f"""SELECT * FROM {otable}
                                 WHERE display_names LIKE :dn
-                                AND type = :mtype
+                                AND LOWER(type) = LOWER(:mtype)
                                 AND sport_id = 'crkt'
                                 LIMIT 1"""),
                             {"dn": f"{variant}%", "mtype": clicked_type}
                         )).mappings().all()
-                        if orows:
-                            orow_found = orows[0]
+                    if orows:
+                        orow_found = orows[0]
 
                 if orow_found:
                     orow = orow_found

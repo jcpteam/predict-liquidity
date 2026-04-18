@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { fetchCricketOrderbook } from '../api'
 import OrderBookChart from './OrderBookChart.jsx'
 
@@ -24,12 +24,22 @@ export default function CricketOrderbook({ platform, marketId, marketType }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showOdds, setShowOdds] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const pollRef = useRef(null)
+
+  const doFetch = () => {
+    return fetchCricketOrderbook(platform, marketId, marketType)
+      .then(d => { setData(d); setLastUpdate(new Date()); return d })
+      .catch(() => null)
+  }
 
   useEffect(() => {
     setLoading(true)
-    fetchCricketOrderbook(platform, marketId, marketType)
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+    doFetch().finally(() => setLoading(false))
+
+    // Poll every 10 seconds for real-time updates
+    pollRef.current = setInterval(() => { doFetch() }, 10000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [platform, marketId, marketType])
 
   if (loading) return <div className="detail-page"><p className="empty">Loading orderbook...</p></div>
@@ -45,6 +55,8 @@ export default function CricketOrderbook({ platform, marketId, marketType }) {
         <h2>{eventName}</h2>
         <div className="detail-title-meta">
           <span className="detail-time">🏏 Cricket{displayMarketType ? ` — ${displayMarketType}` : ''}</span>
+          <span className="live-dot">● LIVE</span>
+          {lastUpdate && <span className="timestamp">Updated: {lastUpdate.toLocaleTimeString()}</span>}
           <button className="btn-toggle-odds" onClick={() => setShowOdds(!showOdds)}>
             {showOdds ? 'Show Predict Format' : 'Show Raw Data'}
           </button>
