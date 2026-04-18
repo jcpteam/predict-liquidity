@@ -1011,25 +1011,38 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             otable = f"market_{op}"
             try:
                 # Match by display_names and start_time (same day)
-                if start_time:
-                    orows = (await session.execute(
-                        _text(f"""SELECT * FROM {otable}
-                            WHERE display_names = :dn
-                            AND DATE(start_time) = DATE(:st)
-                            AND sport_id = 'crkt'
-                            LIMIT 1"""),
-                        {"dn": event_name, "st": start_time}
-                    )).mappings().all()
-                else:
-                    orows = (await session.execute(
-                        _text(f"""SELECT * FROM {otable}
-                            WHERE display_names = :dn
-                            AND sport_id = 'crkt'
-                            LIMIT 1"""),
-                        {"dn": event_name}
-                    )).mappings().all()
-                if orows:
-                    orow = orows[0]
+                # Also try reversed team order (A v B → B v A)
+                name_variants = [event_name]
+                if " v " in event_name:
+                    parts = event_name.split(" v ", 1)
+                    name_variants.append(f"{parts[1]} v {parts[0]}")
+
+                orow_found = None
+                for variant in name_variants:
+                    if orow_found:
+                        break
+                    if start_time:
+                        orows = (await session.execute(
+                            _text(f"""SELECT * FROM {otable}
+                                WHERE display_names LIKE :dn
+                                AND DATE(start_time) = DATE(:st)
+                                AND sport_id = 'crkt'
+                                LIMIT 1"""),
+                            {"dn": f"{variant}%", "st": start_time}
+                        )).mappings().all()
+                    else:
+                        orows = (await session.execute(
+                            _text(f"""SELECT * FROM {otable}
+                                WHERE display_names LIKE :dn
+                                AND sport_id = 'crkt'
+                                LIMIT 1"""),
+                            {"dn": f"{variant}%"}
+                        )).mappings().all()
+                    if orows:
+                        orow_found = orows[0]
+
+                if orow_found:
+                    orow = orow_found
                     mr = orow.get("runners")
                     mo = orow.get("outcomes")
                     if isinstance(mr, str):
@@ -1073,6 +1086,25 @@ async def get_cricket_orderbook(platform: str, market_id: str):
             if pm_adapter:
                 try:
                     events = await pm_adapter.fetch_event(str(pm_data["event_id"]))
+                    # Filter to only outcomes matching the clicked market type
+                    pm_type = pm_data.get("type", "")
+                    if pm_type and events:
+                        # Polymarket returns all markets under the event.
+                        # Filter by matching event_title or outcome to the market type.
+                        # For neg_risk=0 markets (Match Odds etc), outcomes are team names.
+                        # For neg_risk=1 markets, event_title contains the group item title.
+                        pm_outcomes = pm_data.get("outcomes", [])
+                        if pm_outcomes:
+                            # Match by outcome names from DB
+                            outcome_names = set()
+                            for o in pm_outcomes:
+                                if isinstance(o, str):
+                                    outcome_names.add(o.lower())
+                            filtered = [ev for ev in events
+                                        if (ev.outcome and ev.outcome.lower() in outcome_names)
+                                        or (ev.event_title and ev.event_title.lower() in outcome_names)]
+                            if filtered:
+                                events = filtered
                     pm_data["orderbook"] = [ev.model_dump(mode="json") for ev in events]
                 except Exception as e:
                     print(f"[cricket] PM orderbook error: {e}")

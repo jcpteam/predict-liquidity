@@ -117,7 +117,7 @@ class BTXAdapter(BaseMarketAdapter):
         self._stub = self._pb2_grpc.BettingApiStub(self._channel)
 
     async def _load_runner_names(self):
-        """Load competitor/runner names from ref_data stream (once)"""
+        """Load competitor/runner names from ref_data stream (football + cricket)"""
         if self._runner_names_loaded:
             return
         try:
@@ -125,40 +125,42 @@ class BTXAdapter(BaseMarketAdapter):
             await self._ensure_channel()
             if not self._stub:
                 return
-            req = self._pb2.StreamMarketDataRequest(
-                market_types_to_stream=["FOOTBALL_FULL_TIME_MATCH_ODDS"],
-                stream_ref_data=True,
-                stream_ref_data_after_timestamp=0,
-                stream_prices=False,
-            )
-            stream = self._stub.StreamMarketData(req, metadata=self._grpc_metadata())
-            async for msg in stream:
-                if msg.ref_data and msg.ref_data.timestamp > 0:
-                    # Competitors → runner names
-                    for comp in msg.ref_data.competitors:
-                        name = _get_en_name(comp.display_names)
-                        if name:
-                            self._runner_names[comp.id] = name
-                    # Special runners
-                    self._runner_names["DRAW"] = "Draw"
-                    self._runner_names["OVER"] = "Over"
-                    self._runner_names["UNDER"] = "Under"
-                    # Correct score runners (e.g. "0-0", "1-0", etc)
-                    for mkt in msg.ref_data.markets:
-                        for runner in mkt.runners:
-                            rid = runner.id
-                            if rid and rid not in self._runner_names:
-                                # Score format like "0-0", "1-2", etc
-                                if "-" in rid and len(rid) <= 5:
-                                    self._runner_names[rid] = rid
-                                elif rid.startswith("ANY_OTHER"):
-                                    self._runner_names[rid] = rid.replace("_", " ").title()
-                    if self._runner_names:
-                        print(f"[btx] Loaded {len(self._runner_names)} runner names")
-                        self._runner_names_loaded = True
+            # Load from football first
+            for mtype in ["FOOTBALL_FULL_TIME_MATCH_ODDS", "CRICKET_MATCH_ODDS"]:
+                req = self._pb2.StreamMarketDataRequest(
+                    market_types_to_stream=[mtype],
+                    stream_ref_data=True,
+                    stream_ref_data_after_timestamp=0,
+                    stream_prices=False,
+                )
+                try:
+                    stream = self._stub.StreamMarketData(req, metadata=self._grpc_metadata())
+                    async for msg in stream:
+                        if msg.ref_data and msg.ref_data.timestamp > 0:
+                            for comp in msg.ref_data.competitors:
+                                name = _get_en_name(comp.display_names)
+                                if name:
+                                    self._runner_names[comp.id] = name
+                            self._runner_names["DRAW"] = "Draw"
+                            self._runner_names["OVER"] = "Over"
+                            self._runner_names["UNDER"] = "Under"
+                            for mkt in msg.ref_data.markets:
+                                for runner in mkt.runners:
+                                    rid = runner.id
+                                    if rid and rid not in self._runner_names:
+                                        if "-" in rid and len(rid) <= 5:
+                                            self._runner_names[rid] = rid
+                                        elif rid.startswith("ANY_OTHER"):
+                                            self._runner_names[rid] = rid.replace("_", " ").title()
+                            stream.cancel()
+                            break
+                    else:
                         stream.cancel()
-                        return
-            stream.cancel()
+                except Exception as e:
+                    print(f"[btx] Failed to load runner names for {mtype}: {e}")
+            if self._runner_names:
+                print(f"[btx] Loaded {len(self._runner_names)} runner names (football + cricket)")
+                self._runner_names_loaded = True
         except Exception as e:
             print(f"[btx] Failed to load runner names: {e}")
 
