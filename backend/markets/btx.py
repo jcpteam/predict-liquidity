@@ -272,6 +272,7 @@ class BTXAdapter(BaseMarketAdapter):
     async def fetch_event(self, market_id: str) -> list[MarketEvent]:
         """Fetch all outcomes for a BTX market.
         BTX initial price snapshot can take 15-20s to arrive.
+        Accumulates depth for 3s after first data to get fuller orderbook.
         """
         try:
             await self._load_runner_names()
@@ -281,19 +282,24 @@ class BTXAdapter(BaseMarketAdapter):
             import time
             t0 = time.time()
             best_events = []
+            best_depth = 0
+            found_time = None
             async for msg in stream:
-                if time.time() - t0 > 30:
+                elapsed = time.time() - t0
+                if elapsed > 30:
+                    break
+                if found_time and (time.time() - found_time) > 3:
                     break
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
                         events = parsed[market_id]
-                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
-                        if has_data:
-                            stream.cancel()
-                            return events
-                        elif not best_events:
+                        depth = sum(len(e.order_book.bids) + len(e.order_book.asks) for e in events)
+                        if depth > best_depth:
+                            best_depth = depth
                             best_events = events
+                            if found_time is None:
+                                found_time = time.time()
             stream.cancel()
             return best_events
         except Exception as e:
@@ -315,7 +321,9 @@ class BTXAdapter(BaseMarketAdapter):
     ]
 
     async def fetch_cricket_event(self, market_id: str) -> list[MarketEvent]:
-        """Fetch orderbook for a cricket market using cricket-specific market types."""
+        """Fetch orderbook for a cricket market using cricket-specific market types.
+        Waits for initial data then accumulates for 3s to get fuller depth.
+        """
         try:
             await self._load_runner_names()
             stream = await self.stream_market_data(
@@ -327,19 +335,25 @@ class BTXAdapter(BaseMarketAdapter):
             import time
             t0 = time.time()
             best_events = []
+            best_depth = 0
+            found_time = None
             async for msg in stream:
-                if time.time() - t0 > 30:
+                elapsed = time.time() - t0
+                if elapsed > 30:
+                    break
+                # If we found data, keep accumulating for 3 more seconds
+                if found_time and (time.time() - found_time) > 3:
                     break
                 if msg.prices and msg.prices.market_prices:
                     parsed = self.parse_price_message(msg.prices)
                     if market_id in parsed:
                         events = parsed[market_id]
-                        has_data = any(len(e.order_book.bids) > 0 or len(e.order_book.asks) > 0 for e in events)
-                        if has_data:
-                            stream.cancel()
-                            return events
-                        elif not best_events:
+                        depth = sum(len(e.order_book.bids) + len(e.order_book.asks) for e in events)
+                        if depth > best_depth:
+                            best_depth = depth
                             best_events = events
+                            if found_time is None:
+                                found_time = time.time()
             stream.cancel()
             return best_events
         except Exception as e:
