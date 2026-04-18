@@ -121,7 +121,7 @@ async def list_events_by_league(type: str, league: str):
             rows = await _fetch_events_from_table(table_name, league, type)
             for row in rows:
                 # 使用 display_names 和 start_time 作为唯一键
-                key = (row.display_names, row.start_time)
+                key = (row.display_names, row.start_time.strftime("%Y-%m-%d"))
                 platform_name = table_name.replace("market_", "")
 
                 if key not in events_dict:
@@ -190,7 +190,7 @@ async def _fetch_markets_from_table(table_name: str, display_name: str, start_ti
             text(f"""
                 SELECT * FROM {table_name}
                 WHERE display_names = :display_name
-                AND start_time = :start_time
+                AND date_format(start_time,'%Y-%m-%d') = :start_time
                 AND sport_id = :sport_id
             """),
             {
@@ -221,7 +221,7 @@ async def list_all_market_by_event(request: EventQueryRequest):
             rows = await _fetch_markets_from_table(
                 table_name,
                 request.display_name,
-                request.start_time,
+                request.start_time[0:10],
                 request.sport_id
             )
             markets_data = []
