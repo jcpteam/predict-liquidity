@@ -211,14 +211,14 @@ class BTXAdapter(BaseMarketAdapter):
                     h = hval / (10 ** hdps) if hdps else float(hval)
                     handicap_str = f" ({'+' if h > 0 else ''}{h:.1f})" if h != 0 else ""
                 bids = []
-                for bp in rp.lay_prices:
+                for bp in rp.back_prices:
                     odds = _decimal_to_float(bp.price)
                     size = _decimal_to_float(bp.size)
                     if odds > 0 and size > 0:
                         prob = round(1.0 / odds, 4) if odds > 1 else odds
                         bids.append(OrderLevel(price=prob, size=round(size, 2)))
                 asks = []
-                for lp in rp.back_prices:
+                for lp in rp.lay_prices:
                     odds = _decimal_to_float(lp.price)
                     size = _decimal_to_float(lp.size)
                     if odds > 0 and size > 0:
